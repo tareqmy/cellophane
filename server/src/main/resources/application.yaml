@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: cellophane
+
+server:
+  port: ${CELLOPHANE_HTTP_PORT:8025}
+
+springdoc:
+  api-docs:
+    path: /api/openapi.json
+  swagger-ui:
+    path: /api
