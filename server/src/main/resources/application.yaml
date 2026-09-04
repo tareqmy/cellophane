@@ -4,6 +4,8 @@ spring:
 
 server:
   port: ${CELLOPHANE_HTTP_PORT:8025}
+  # The UI keeps an SSE stream open, so a graceful shutdown would always wait out its timeout.
+  shutdown: immediate
 
 cellophane:
   smpp-port: ${CELLOPHANE_SMPP_PORT:2775}

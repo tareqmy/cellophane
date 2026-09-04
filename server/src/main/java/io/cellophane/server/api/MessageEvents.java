@@ -4,6 +4,7 @@ import io.cellophane.server.message.Message;
 import io.cellophane.server.message.MessageListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Fans inbox changes out to every open server-sent-events stream. */
-public final class MessageEvents implements MessageListener {
+public final class MessageEvents implements MessageListener, DisposableBean {
 
     private static final Logger log = LoggerFactory.getLogger(MessageEvents.class);
 
@@ -57,6 +58,15 @@ public final class MessageEvents implements MessageListener {
     @Scheduled(fixedRate = 25_000)
     public void heartbeat() {
         broadcast(SseEmitter.event().comment("ping"));
+    }
+
+    /** Ends every open stream so the web server can stop without waiting for them. */
+    @Override
+    public void destroy() {
+        for (SseEmitter emitter : emitters) {
+            emitter.complete();
+        }
+        emitters.clear();
     }
 
     private void broadcast(SseEmitter.SseEventBuilder event) {
