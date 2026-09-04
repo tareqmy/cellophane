@@ -44,6 +44,11 @@ public final class MessageEvents implements MessageListener {
     }
 
     @Override
+    public void onUpdated(Message message) {
+        broadcast(SseEmitter.event().name("updated").data(MessageSummary.of(message), MediaType.APPLICATION_JSON));
+    }
+
+    @Override
     public void onCleared() {
         broadcast(SseEmitter.event().name("cleared").data("{}", MediaType.APPLICATION_JSON));
     }

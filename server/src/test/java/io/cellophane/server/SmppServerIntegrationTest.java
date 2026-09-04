@@ -16,6 +16,8 @@ import com.cloudhopper.smpp.type.SmppBindException;
 import io.cellophane.server.api.MessageDetail;
 import io.cellophane.server.api.MessagesPage;
 import io.cellophane.server.smpp.SmppServer;
+import io.cellophane.smpp.text.Gsm7;
+import io.cellophane.smpp.text.Udh;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -101,9 +103,15 @@ class SmppServerIntegrationTest {
                 .body(MessageDetail.class);
         assertThat(detail.from().address()).isEqualTo("MyApp");
         assertThat(detail.from().ton()).isEqualTo(5);
-        assertThat(detail.pdu().dataCoding()).isZero();
-        assertThat(detail.rawPduHex()).startsWith("000000").contains("00000004"); // submit_sm command id
-        assertThat(detail.sessionId()).startsWith("s");
+        assertThat(detail.segments()).hasSize(1);
+        MessageDetail.SegmentView segment = detail.segments().getFirst();
+        assertThat(segment.pdu().dataCoding()).isZero();
+        assertThat(segment.rawPduHex()).startsWith("000000").contains("00000004"); // submit_sm command id
+        assertThat(segment.sessionId()).startsWith("s");
+        assertThat(segment.fields()).isNotEmpty();
+        assertThat(segment.fields().getFirst().name()).isEqualTo("command_length");
+        assertThat(segment.fields().stream().mapToInt(MessageDetail.FieldView::length).sum())
+                .isEqualTo(segment.rawPduHex().length() / 2);
 
         List<Map<String, Object>> sessions = http.get().uri("/api/v1/sessions").retrieve()
                 .body(new ParameterizedTypeReference<>() { });
@@ -111,6 +119,34 @@ class SmppServerIntegrationTest {
             assertThat(s).containsEntry("account", "app").containsEntry("bindType", "TRANSCEIVER");
             assertThat(((Number) s.get("submitted")).intValue()).isEqualTo(1);
         });
+    }
+
+    @Test
+    void concatenatedPartsAreReassembledIntoOneMessage() throws Exception {
+        session = client.bind(config(SmppBindType.TRANSCEIVER, "app", "secret"), new DefaultSmppSessionHandler());
+        String[] parts = {"This is a long message that has been split ", "into two parts by the sender."};
+        String[] ids = new String[2];
+        for (int i = 0; i < 2; i++) {
+            SubmitSm sm = submit("MyApp", "8801711111111",
+                    Udh.concat8(0x2A, 2, i + 1).prepend(Gsm7.encode(parts[i])), 0);
+            sm.setEsmClass(SmppConstants.ESM_CLASS_UDHI_MASK);
+            ids[i] = session.submit(sm, 5000).getMessageId();
+        }
+        assertThat(ids[0]).isNotEqualTo(ids[1]);
+
+        MessagesPage page = http.get().uri("/api/v1/messages").retrieve().body(MessagesPage.class);
+        assertThat(page.total()).isEqualTo(1);
+        assertThat(page.messages().getFirst().text()).isEqualTo(parts[0] + parts[1]);
+        assertThat(page.messages().getFirst().parts()).isEqualTo(2);
+        assertThat(page.messages().getFirst().partsReceived()).isEqualTo(2);
+        assertThat(page.messages().getFirst().id()).isEqualTo(ids[0]);
+
+        MessageDetail detail = http.get().uri("/api/v1/messages/{id}", ids[0]).retrieve().body(MessageDetail.class);
+        assertThat(detail.concatReference()).isEqualTo(0x2A);
+        assertThat(detail.segments()).extracting(MessageDetail.SegmentView::messageId).containsExactly(ids);
+        assertThat(detail.segments().getFirst().udh().total()).isEqualTo(2);
+        assertThat(detail.segments().getFirst().fields()).extracting(MessageDetail.FieldView::name)
+                .contains("esm_class", "short_message");
     }
 
     @Test

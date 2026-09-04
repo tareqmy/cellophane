@@ -7,14 +7,12 @@ import io.cellophane.smpp.codec.PduCodec;
 import io.cellophane.smpp.pdu.Address;
 import io.cellophane.smpp.pdu.SubmitSm;
 import io.cellophane.smpp.text.Gsm7;
-import io.cellophane.smpp.text.Udh;
+import io.netty.buffer.Unpooled;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -22,23 +20,13 @@ class MessageStoreTest {
 
     private static final Instant T0 = Instant.parse("2026-09-04T10:00:00Z");
     private final Clock clock = Clock.fixed(T0, ZoneOffset.UTC);
-    private final List<Message> published = new ArrayList<>();
+    private final RecordingListener listener = new RecordingListener();
     private final MessageStore store = new MessageStore(3);
-    private final Inbox inbox = new Inbox(store, new MessageListener() {
-        @Override
-        public void onMessage(Message message) {
-            published.add(message);
-        }
-
-        @Override
-        public void onCleared() {
-            published.clear();
-        }
-    }, clock);
+    private final Inbox inbox = new Inbox(store, listener, clock);
 
     private Message receive(String from, String to, String text) {
         SubmitSm pdu = SubmitSm.of(1, Address.alphanumeric(from), Address.international(to), 0, Gsm7.encode(text));
-        return inbox.receive("app", "s1", pdu, PduCodec.encode(pdu));
+        return inbox.receive("app", "s1", pdu, PduCodec.encode(pdu)).message();
     }
 
     @Test
@@ -49,28 +37,19 @@ class MessageStoreTest {
         assertThat(m.encoding()).isEqualTo("GSM 7-bit");
         assertThat(m.id()).hasSize(26);
         assertThat(m.receivedAt()).isEqualTo(T0);
+        assertThat(m.parts()).isEqualTo(1);
+        assertThat(m.segments()).hasSize(1);
+        assertThat(m.segments().getFirst().messageId()).isEqualTo(m.id());
         assertThat(m.status()).isEqualTo(MessageStatus.ACCEPTED);
-        assertThat(published).containsExactly(m);
+        assertThat(listener.created).containsExactly(m);
         assertThat(store.get(m.id())).contains(m);
-    }
-
-    @Test
-    void stripsUdhBeforeDecodingAndExposesConcatInfo() {
-        byte[] userData = Udh.concat8(0x42, 3, 2).prepend(Gsm7.encode("middle part"));
-        SubmitSm pdu = new SubmitSm(1, "", Address.alphanumeric("A"), Address.international("1"), 0x40, 0, 0, "",
-                "", 0, 0, 0, 0, userData, List.of());
-
-        Message m = inbox.receive("app", "s1", pdu, PduCodec.encode(pdu));
-
-        assertThat(m.text()).isEqualTo("middle part");
-        assertThat(m.concat()).contains(new Udh.Concat(0x42, 3, 2));
     }
 
     @Test
     void keepsBinaryPayloadsWithoutText() {
         SubmitSm pdu = SubmitSm.of(1, Address.empty(), Address.international("1"), 4, new byte[] {1, 2, 3});
 
-        Message m = inbox.receive("app", "s1", pdu, PduCodec.encode(pdu));
+        Message m = inbox.receive("app", "s1", pdu, PduCodec.encode(pdu)).message();
 
         assertThat(m.text()).isNull();
         assertThat(m.encoding()).isEqualTo("binary");
@@ -88,41 +67,39 @@ class MessageStoreTest {
         assertThat(store.get(d.id())).isPresent();
         assertThat(store.list(MessageQuery.all(10)).messages()).extracting(Message::text)
                 .containsExactly("d", "c", "b");
+        assertThat(store.update(a)).as("evicted messages cannot be updated").isFalse();
     }
 
     @Test
     void filtersAndPagesNewestFirst() {
         MessageStore big = new MessageStore(100);
-        Inbox in = new Inbox(big, new MessageListener() {
-            @Override
-            public void onMessage(Message message) {
-            }
-
-            @Override
-            public void onCleared() {
-            }
-        }, clock);
+        Inbox in = new Inbox(big, new RecordingListener(), clock);
         for (int i = 0; i < 5; i++) {
             SubmitSm pdu = SubmitSm.of(i, Address.alphanumeric(i % 2 == 0 ? "Even" : "Odd"),
                     Address.international("88017" + i), 0, Gsm7.encode("OTP " + i));
             in.receive(i < 3 ? "app" : "chaos", "s1", pdu, PduCodec.encode(pdu));
         }
 
-        MessageStore.Page odd = big.list(new MessageQuery(null, "odd", null, null, null, 0, 10));
+        MessageStore.Page odd = big.list(new MessageQuery(null, null, "odd", null, null, null, 0, 10));
         assertThat(odd.total()).isEqualTo(2);
         assertThat(odd.messages()).extracting(Message::text).containsExactly("OTP 3", "OTP 1");
 
-        MessageStore.Page to = big.list(new MessageQuery("880172", null, "otp", "app", null, 0, 10));
+        MessageStore.Page to = big.list(new MessageQuery(null, "880172", null, "otp", "app", null, 0, 10));
         assertThat(to.messages()).extracting(Message::text).containsExactly("OTP 2");
 
-        MessageStore.Page paged = big.list(new MessageQuery(null, null, null, null, null, 1, 2));
+        MessageStore.Page any = big.list(new MessageQuery("even", null, null, null, null, null, 0, 10));
+        assertThat(any.total()).isEqualTo(3);
+        assertThat(big.list(new MessageQuery("880174", null, null, null, null, null, 0, 10)).total()).isEqualTo(1);
+        assertThat(big.list(new MessageQuery("otp 1", null, null, null, null, null, 0, 10)).total()).isEqualTo(1);
+
+        MessageStore.Page paged = big.list(new MessageQuery(null, null, null, null, null, null, 1, 2));
         assertThat(paged.total()).isEqualTo(5);
         assertThat(paged.messages()).extracting(Message::text).containsExactly("OTP 3", "OTP 2");
 
-        MessageStore.Page since = big.list(new MessageQuery(null, null, null, null, T0.plusSeconds(1), 0, 10));
+        MessageStore.Page since = big.list(new MessageQuery(null, null, null, null, null, T0.plusSeconds(1), 0, 10));
         assertThat(since.total()).isZero();
 
-        assertThatThrownBy(() -> new MessageQuery(null, null, null, null, null, 0, 0))
+        assertThatThrownBy(() -> new MessageQuery(null, null, null, null, null, null, 0, 0))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -135,10 +112,11 @@ class MessageStoreTest {
         assertThat(m.to()).isEqualTo(Address.international("8801711111111"));
         assertThat(m.encoding()).isEqualTo("UCS-2");
         assertThat(m.text()).isEqualTo("আপনার OTP");
-        assertThat(PduCodec.decode(io.netty.buffer.Unpooled.wrappedBuffer(m.rawPdu()))).isEqualTo(m.pdu());
+        Segment segment = m.segments().getFirst();
+        assertThat(PduCodec.decode(Unpooled.wrappedBuffer(segment.rawPdu()))).isEqualTo(segment.pdu());
 
         Message longOne = inbox.receiveHttp("1", "2", "x".repeat(400));
-        assertThat(longOne.pdu().shortMessage()).isEmpty();
+        assertThat(longOne.segments().getFirst().pdu().shortMessage()).isEmpty();
         assertThat(longOne.text()).hasSize(400);
     }
 
@@ -148,7 +126,7 @@ class MessageStoreTest {
 
         assertThat(inbox.clear()).isEqualTo(1);
         assertThat(store.size()).isZero();
-        assertThat(published).isEmpty();
+        assertThat(listener.cleared).isEqualTo(1);
     }
 
     @Test

@@ -10,6 +10,7 @@
   --accent: #0ea5e9;
   --ok: #16a34a;
   --warn: #d97706;
+  --select: #eaf6fd;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,24 +20,41 @@
     --muted: #9ca3af;
     --line: #262a33;
     --panel: #161920;
+    --select: #17273a;
   }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 header {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1.25rem;
+  padding: 0.6rem 1.25rem;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
-  position: sticky;
-  top: 0;
+  flex: none;
 }
 
 h1 {
@@ -47,6 +65,18 @@ h1 {
 
 .tagline {
   color: var(--muted);
+  margin-right: 1rem;
+}
+
+input[type='search'] {
+  font: inherit;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  width: 22rem;
+  max-width: 40vw;
 }
 
 .spacer {
@@ -85,8 +115,40 @@ button:disabled {
   cursor: default;
 }
 
-main {
+.layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.layout.split {
+  grid-template-columns: minmax(0, 1fr) minmax(28rem, 46%);
+}
+
+main,
+aside {
+  overflow: auto;
   padding: 1rem 1.25rem;
+}
+
+aside {
+  border-left: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.aside-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+button.close {
+  border: none;
+  background: none;
+  font-size: 1rem;
+  color: var(--muted);
 }
 
 table {
@@ -112,6 +174,18 @@ th {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+tbody tr {
+  cursor: pointer;
+}
+
+tbody tr:hover {
+  background: color-mix(in srgb, var(--select) 60%, transparent);
+}
+
+tbody tr.selected {
+  background: var(--select);
 }
 
 tr:last-child td {
@@ -151,6 +225,11 @@ td.text {
   border-color: var(--accent);
 }
 
+.badge.parts.incomplete {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
 .empty {
   max-width: 48rem;
   margin: 4rem auto;
@@ -169,4 +248,13 @@ pre {
 
 .error {
   color: #dc2626;
+}
+
+@media (max-width: 900px) {
+  .layout.split {
+    grid-template-columns: 1fr;
+  }
+  .layout.split main {
+    display: none;
+  }
 }

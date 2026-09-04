@@ -1,6 +1,8 @@
 package io.cellophane.server.api;
 
 import io.cellophane.server.message.Message;
+import io.cellophane.server.message.Segment;
+import io.cellophane.smpp.codec.PduAnnotator;
 import io.cellophane.smpp.pdu.Address;
 import io.cellophane.smpp.pdu.SubmitSm;
 import io.cellophane.smpp.pdu.Tlv;
@@ -10,10 +12,10 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 
-/** Everything the inbox knows about one message, including the decoded PDU fields and the raw bytes. */
-public record MessageDetail(String id, Instant receivedAt, String account, String sessionId, AddressView from,
-                            AddressView to, String text, String encoding, int parts, Integer part, String status,
-                            PduView pdu, UdhView udh, String rawPduHex) {
+/** Everything the inbox knows about one message: each part's decoded PDU, its raw bytes and their annotation. */
+public record MessageDetail(String id, Instant receivedAt, Instant updatedAt, String account, AddressView from,
+                            AddressView to, String text, String encoding, int dataCoding, int parts,
+                            int partsReceived, Integer concatReference, String status, List<SegmentView> segments) {
 
     private static final HexFormat HEX = HexFormat.of();
 
@@ -53,10 +55,25 @@ public record MessageDetail(String id, Instant receivedAt, String account, Strin
         }
     }
 
+    /** A byte range of the raw PDU and what it means. */
+    public record FieldView(int offset, int length, String name, String value) {
+        static FieldView of(PduAnnotator.Field f) {
+            return new FieldView(f.offset(), f.length(), f.name(), f.value());
+        }
+    }
+
+    public record SegmentView(String messageId, int sequence, Instant receivedAt, String sessionId, String text,
+                              PduView pdu, UdhView udh, String rawPduHex, List<FieldView> fields) {
+        static SegmentView of(Segment s) {
+            return new SegmentView(s.messageId(), s.sequence(), s.receivedAt(), s.sessionId(), s.text(),
+                    PduView.of(s.pdu()), s.udh() == null ? null : UdhView.of(s.udh()), HEX.formatHex(s.rawPdu()),
+                    PduAnnotator.annotate(s.rawPdu()).stream().map(FieldView::of).toList());
+        }
+    }
+
     public static MessageDetail of(Message m) {
-        MessageSummary s = MessageSummary.of(m);
-        return new MessageDetail(s.id(), s.receivedAt(), s.account(), m.sessionId(), AddressView.of(m.from()),
-                AddressView.of(m.to()), s.text(), s.encoding(), s.parts(), s.part(), s.status(),
-                PduView.of(m.pdu()), m.udh() == null ? null : UdhView.of(m.udh()), HEX.formatHex(m.rawPdu()));
+        return new MessageDetail(m.id(), m.receivedAt(), m.updatedAt(), m.account(), AddressView.of(m.from()),
+                AddressView.of(m.to()), m.text(), m.encoding(), m.dataCoding(), m.parts(), m.partsReceived(),
+                m.concatReference(), m.status().name(), m.segments().stream().map(SegmentView::of).toList());
     }
 }

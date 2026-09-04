@@ -1,29 +1,29 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import {
+    clearMessages,
+    formatTime,
+    getMessage,
+    listMessages,
+    matches,
+    type MessageDetail,
+    type MessageSummary,
+  } from './lib/api'
+  import Detail from './lib/MessageDetail.svelte'
 
-  type Message = {
-    id: string
-    receivedAt: string
-    account: string
-    from: string
-    to: string
-    text: string | null
-    encoding: string
-    parts: number
-    part: number | null
-    status: string
-  }
-
-  let messages: Message[] = $state([])
+  let messages: MessageSummary[] = $state([])
   let total = $state(0)
   let live = $state(false)
   let error: string | null = $state(null)
+  let query = $state('')
+  let selectedId: string | null = $state(null)
+  let detail: MessageDetail | null = $state(null)
+
+  let searchTimer: ReturnType<typeof setTimeout> | undefined
 
   async function load() {
     try {
-      const res = await fetch('/api/v1/messages?limit=200')
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-      const page = await res.json()
+      const page = await listMessages(query)
       messages = page.messages
       total = page.total
       error = null
@@ -32,10 +32,43 @@
     }
   }
 
+  function search(value: string) {
+    query = value
+    clearTimeout(searchTimer)
+    searchTimer = setTimeout(load, 150)
+  }
+
+  async function select(id: string) {
+    selectedId = id
+    try {
+      detail = await getMessage(id)
+    } catch (e) {
+      detail = null
+      error = `Could not load message: ${(e as Error).message}`
+    }
+  }
+
+  function close() {
+    selectedId = null
+    detail = null
+  }
+
   async function clear() {
-    await fetch('/api/v1/messages', { method: 'DELETE' })
+    await clearMessages()
     messages = []
     total = 0
+    close()
+  }
+
+  function upsert(m: MessageSummary, isNew: boolean) {
+    const i = messages.findIndex((x) => x.id === m.id)
+    if (i >= 0) {
+      messages[i] = m
+    } else if (isNew && matches(m, query)) {
+      messages = [m, ...messages].slice(0, 500)
+      total += 1
+    }
+    if (selectedId === m.id) select(m.id)
   }
 
   onMount(() => {
@@ -43,77 +76,106 @@
     const stream = new EventSource('/api/v1/messages/stream')
     stream.onopen = () => (live = true)
     stream.onerror = () => (live = false)
-    stream.addEventListener('message', (e) => {
-      const m = JSON.parse(e.data) as Message
-      messages = [m, ...messages].slice(0, 500)
-      total += 1
-    })
+    stream.addEventListener('message', (e) => upsert(JSON.parse(e.data), true))
+    stream.addEventListener('updated', (e) => upsert(JSON.parse(e.data), false))
     stream.addEventListener('cleared', () => {
       messages = []
       total = 0
+      close()
     })
-    return () => stream.close()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      stream.close()
+      window.removeEventListener('keydown', onKey)
+    }
   })
-
-  function time(iso: string) {
-    return new Date(iso).toLocaleTimeString([], { hour12: false })
-  }
 </script>
 
 <header>
   <h1>Cellophane</h1>
   <span class="tagline">the see-through SMSC</span>
+  <input
+    type="search"
+    placeholder="Search sender, recipient or text"
+    value={query}
+    oninput={(e) => search((e.target as HTMLInputElement).value)}
+  />
   <span class="spacer"></span>
   <span class="status" class:live>{live ? 'live' : 'reconnecting'}</span>
   <span class="count">{total} message{total === 1 ? '' : 's'}</span>
   <button onclick={clear} disabled={total === 0}>Clear inbox</button>
 </header>
 
-<main>
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+<div class="layout" class:split={selectedId !== null}>
+  <main>
+    {#if error}
+      <p class="error">{error}</p>
+    {/if}
 
-  {#if messages.length === 0}
-    <section class="empty">
-      <p>No messages yet. Bind an SMPP client to port <code>2775</code>, or try:</p>
-      <pre>curl -X POST localhost:8025/api/v1/send \
+    {#if messages.length === 0}
+      <section class="empty">
+        {#if query}
+          <p>Nothing matches “{query}”.</p>
+        {:else}
+          <p>No messages yet. Bind an SMPP client to port <code>2775</code>, or try:</p>
+          <pre>curl -X POST localhost:8025/api/v1/send \
   -H 'content-type: application/json' \
   -d '&#123;"from":"MyApp","to":"8801711111111","text":"Your OTP is 482913"&#125;'</pre>
-    </section>
-  {:else}
-    <table>
-      <thead>
-        <tr>
-          <th class="time">Time</th>
-          <th>Account</th>
-          <th>From</th>
-          <th>To</th>
-          <th class="text">Text</th>
-          <th>Encoding</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each messages as m (m.id)}
+        {/if}
+      </section>
+    {:else}
+      <table>
+        <thead>
           <tr>
-            <td class="time mono">{time(m.receivedAt)}</td>
-            <td><span class="badge">{m.account}</span></td>
-            <td class="mono">{m.from}</td>
-            <td class="mono">{m.to}</td>
-            <td class="text">
-              {#if m.text === null}
-                <em class="muted">binary</em>
-              {:else}
-                {m.text}
-              {/if}
-              {#if m.parts > 1}
-                <span class="badge parts">{m.part}/{m.parts}</span>
-              {/if}
-            </td>
-            <td class="muted">{m.encoding}</td>
+            <th class="time">Time</th>
+            <th>Account</th>
+            <th>From</th>
+            <th>To</th>
+            <th class="text">Text</th>
+            <th>Encoding</th>
           </tr>
-        {/each}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {#each messages as m (m.id)}
+            <tr class:selected={m.id === selectedId} onclick={() => select(m.id)}>
+              <td class="time mono">{formatTime(m.receivedAt)}</td>
+              <td><span class="badge">{m.account}</span></td>
+              <td class="mono">{m.from}</td>
+              <td class="mono">{m.to}</td>
+              <td class="text">
+                {#if m.text === null}
+                  <em class="muted">binary</em>
+                {:else}
+                  {m.text}
+                {/if}
+                {#if m.parts > 1}
+                  <span class="badge parts" class:incomplete={m.partsReceived < m.parts}
+                    >{m.partsReceived}/{m.parts} parts</span
+                  >
+                {/if}
+              </td>
+              <td class="muted">{m.encoding}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+  </main>
+
+  {#if selectedId !== null}
+    <aside>
+      <div class="aside-bar">
+        <span class="muted">Message</span>
+        <button class="close" onclick={close} title="Close (Esc)">✕</button>
+      </div>
+      {#if detail}
+        <Detail {detail} />
+      {:else}
+        <p class="muted">Loading…</p>
+      {/if}
+    </aside>
   {/if}
-</main>
+</div>

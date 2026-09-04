@@ -10,7 +10,6 @@ import static io.cellophane.smpp.CommandStatus.ESME_ROK;
 import io.cellophane.server.account.Account;
 import io.cellophane.server.account.AccountRegistry;
 import io.cellophane.server.message.Inbox;
-import io.cellophane.server.message.Message;
 import io.cellophane.smpp.CommandStatus;
 import io.cellophane.smpp.codec.PduCodec;
 import io.cellophane.smpp.codec.PduException;
@@ -116,10 +115,10 @@ final class SmppSessionHandler extends SimpleChannelInboundHandler<Pdu> {
             return;
         }
         byte[] raw = ctx.channel().attr(RawPduCapture.RAW_PDU).get();
-        Message message = inbox.receive(session.account().orElseThrow().systemId(), session.id(), submit,
+        Inbox.Accepted accepted = inbox.receive(session.account().orElseThrow().systemId(), session.id(), submit,
                 raw != null ? raw : PduCodec.encode(submit));
         session.countSubmit();
-        ctx.writeAndFlush(submit.respond(ESME_ROK.code(), message.id()));
+        ctx.writeAndFlush(submit.respond(ESME_ROK.code(), accepted.segment().messageId()));
     }
 
     @Override

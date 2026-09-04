@@ -39,7 +39,8 @@ class MessagesController {
     }
 
     @GetMapping("/messages")
-    MessagesPage list(@RequestParam(required = false) String to,
+    MessagesPage list(@RequestParam(required = false) String q,
+                      @RequestParam(required = false) String to,
                       @RequestParam(required = false) String from,
                       @RequestParam(required = false) String text,
                       @RequestParam(required = false) String account,
@@ -49,7 +50,7 @@ class MessagesController {
         MessageQuery query;
         try {
             Instant sinceInstant = since == null || since.isBlank() ? null : Since.parse(since, clock);
-            query = new MessageQuery(to, from, text, account, sinceInstant, offset, limit);
+            query = new MessageQuery(q, to, from, text, account, sinceInstant, offset, limit);
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }

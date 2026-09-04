@@ -3,8 +3,12 @@ package io.cellophane.server.message;
 import java.time.Instant;
 import java.util.Locale;
 
-/** Inbox search. Text fields match case-insensitively on containment; account matches exactly; nulls match all. */
-public record MessageQuery(String to, String from, String text, String account, Instant since, int offset, int limit) {
+/**
+ * Inbox search. {@code q} matches sender, recipient or text; the named fields narrow further. Text matching is
+ * case-insensitive containment, account is exact, nulls match everything.
+ */
+public record MessageQuery(String q, String to, String from, String text, String account, Instant since, int offset,
+                           int limit) {
 
     public static final int DEFAULT_LIMIT = 50;
     public static final int MAX_LIMIT = 1000;
@@ -19,15 +23,23 @@ public record MessageQuery(String to, String from, String text, String account, 
     }
 
     public static MessageQuery all(int limit) {
-        return new MessageQuery(null, null, null, null, null, 0, limit);
+        return new MessageQuery(null, null, null, null, null, null, 0, limit);
     }
 
     public boolean matches(Message m) {
-        return contains(m.to().address(), to)
+        return matchesAny(m)
+                && contains(m.to().address(), to)
                 && contains(m.from().address(), from)
                 && contains(m.text(), text)
                 && (account == null || account.equals(m.account()))
                 && (since == null || !m.receivedAt().isBefore(since));
+    }
+
+    private boolean matchesAny(Message m) {
+        if (q == null || q.isBlank()) {
+            return true;
+        }
+        return contains(m.to().address(), q) || contains(m.from().address(), q) || contains(m.text(), q);
     }
 
     private static boolean contains(String haystack, String needle) {
