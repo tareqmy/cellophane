@@ -20,14 +20,23 @@ dependencies {
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj.core)
+    // Independent SMPP implementation (Netty 3 based) used as the client in conformance tests.
+    testImplementation(libs.cloudhopper.smpp)
     testRuntimeOnly(libs.junit.platform.launcher)
+    testRuntimeOnly(libs.slf4j.simple)
 }
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
-    options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
+    options.compilerArgs.add("-Xlint:all")
+}
+
+// Production code must be warning-free; tests talk to cloudhopper's raw generic types.
+tasks.compileJava {
+    options.compilerArgs.add("-Werror")
 }
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn")
 }
