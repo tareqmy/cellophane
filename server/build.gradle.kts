@@ -21,10 +21,12 @@ dependencies {
     implementation(project(":smpp"))
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation(libs.springdoc.webmvc.ui)
+    implementation("org.yaml:snakeyaml")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     // Independent SMPP client for end-to-end tests against the listener.
     testImplementation(libs.cloudhopper.smpp)
+    testImplementation("org.awaitility:awaitility")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     ui(project(mapOf("path" to ":ui", "configuration" to "dist")))

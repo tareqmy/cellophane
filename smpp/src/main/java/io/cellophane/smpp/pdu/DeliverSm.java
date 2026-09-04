@@ -40,6 +40,13 @@ public record DeliverSm(int sequenceNumber, String serviceType, Address source, 
         return 0;
     }
 
+    /** The same PDU under a different sequence number, for sending a prepared receipt on a chosen session. */
+    public DeliverSm withSequenceNumber(int newSequenceNumber) {
+        return new DeliverSm(newSequenceNumber, serviceType, source, destination, esmClass, protocolId, priorityFlag,
+                scheduleDeliveryTime, validityPeriod, registeredDelivery, replaceIfPresent, dataCoding,
+                smDefaultMsgId, shortMessage, tlvs);
+    }
+
     public DeliverSmResp respond(int commandStatus) {
         return new DeliverSmResp(commandStatus, sequenceNumber);
     }

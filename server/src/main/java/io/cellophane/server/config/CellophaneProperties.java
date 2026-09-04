@@ -11,11 +11,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param accounts    comma-separated {@code system_id:password[:window]} ESME accounts
  * @param maxMessages in-memory inbox capacity; the oldest message is dropped when full
  * @param systemId    the system_id the fake operator reports in bind responses
+ * @param rules       path of a rules YAML file to load at start; empty for the built-in default rules
  */
 @ConfigurationProperties("cellophane")
 public record CellophaneProperties(
         @DefaultValue("2775") int smppPort,
         @DefaultValue("cellophane:cellophane") String accounts,
         @DefaultValue("10000") int maxMessages,
-        @DefaultValue("cellophane") String systemId) {
+        @DefaultValue("cellophane") String systemId,
+        @DefaultValue("") String rules) {
 }

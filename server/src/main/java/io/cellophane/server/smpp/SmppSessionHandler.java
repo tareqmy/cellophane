@@ -9,7 +9,8 @@ import static io.cellophane.smpp.CommandStatus.ESME_ROK;
 
 import io.cellophane.server.account.Account;
 import io.cellophane.server.account.AccountRegistry;
-import io.cellophane.server.message.Inbox;
+import io.cellophane.server.operator.Operator;
+import io.cellophane.server.operator.ReceiptDispatcher;
 import io.cellophane.smpp.CommandStatus;
 import io.cellophane.smpp.codec.PduCodec;
 import io.cellophane.smpp.codec.PduException;
@@ -41,14 +42,17 @@ final class SmppSessionHandler extends SimpleChannelInboundHandler<Pdu> {
     private final String smscSystemId;
     private final AccountRegistry accounts;
     private final SessionRegistry sessions;
-    private final Inbox inbox;
+    private final Operator operator;
+    private final ReceiptDispatcher receipts;
     private SmppSession session;
 
-    SmppSessionHandler(String smscSystemId, AccountRegistry accounts, SessionRegistry sessions, Inbox inbox) {
+    SmppSessionHandler(String smscSystemId, AccountRegistry accounts, SessionRegistry sessions, Operator operator,
+                       ReceiptDispatcher receipts) {
         this.smscSystemId = smscSystemId;
         this.accounts = accounts;
         this.sessions = sessions;
-        this.inbox = inbox;
+        this.operator = operator;
+        this.receipts = receipts;
     }
 
     @Override
@@ -75,8 +79,11 @@ final class SmppSessionHandler extends SimpleChannelInboundHandler<Pdu> {
                 log.info("[{}] unbind", session.id());
                 ctx.writeAndFlush(unbind.respond(ESME_ROK.code())).addListener(ChannelFutureListener.CLOSE);
             }
-            case DeliverSmResp resp -> log.debug("[{}] deliver_sm_resp seq={} status={}", session.id(),
-                    resp.sequenceNumber(), CommandStatus.describe(resp.commandStatus()));
+            case DeliverSmResp resp -> {
+                log.debug("[{}] deliver_sm_resp seq={} status={}", session.id(), resp.sequenceNumber(),
+                        CommandStatus.describe(resp.commandStatus()));
+                receipts.onReceiptAck(session, resp);
+            }
             case GenericNack nack -> log.warn("[{}] ESME sent generic_nack seq={} status={}", session.id(),
                     nack.sequenceNumber(), CommandStatus.describe(nack.commandStatus()));
             case UnknownPdu unknown -> {
@@ -105,6 +112,7 @@ final class SmppSessionHandler extends SimpleChannelInboundHandler<Pdu> {
         log.info("[{}] '{}' bound as {}", session.id(), bind.systemId(), type);
         ctx.writeAndFlush(new BindResp(bind.command().response().orElseThrow(), ESME_ROK.code(),
                 bind.sequenceNumber(), smscSystemId, List.of(Tlv.ofByte(Tlv.Tag.SC_INTERFACE_VERSION, 0x34))));
+        receipts.flush(session);
     }
 
     private void onSubmit(ChannelHandlerContext ctx, SubmitSm submit) {
@@ -115,10 +123,10 @@ final class SmppSessionHandler extends SimpleChannelInboundHandler<Pdu> {
             return;
         }
         byte[] raw = ctx.channel().attr(RawPduCapture.RAW_PDU).get();
-        Inbox.Accepted accepted = inbox.receive(session.account().orElseThrow().systemId(), session.id(), submit,
-                raw != null ? raw : PduCodec.encode(submit));
+        Operator.Outcome outcome = operator.onSubmit(session.account().orElseThrow().systemId(), session.id(),
+                submit, raw != null ? raw : PduCodec.encode(submit));
         session.countSubmit();
-        ctx.writeAndFlush(submit.respond(ESME_ROK.code(), accepted.segment().messageId()));
+        ctx.writeAndFlush(submit.respond(outcome.commandStatus(), outcome.messageId()));
     }
 
     @Override

@@ -36,12 +36,15 @@ export type UdhView = {
   elements: { id: number; hex: string }[]
 }
 export type FieldView = { offset: number; length: number; name: string; value: string }
+export type EventView = { at: string; type: string; detail: string }
 export type SegmentView = {
   messageId: string
   sequence: number
   receivedAt: string
   sessionId: string
   text: string | null
+  status: string
+  events: EventView[]
   pdu: PduView
   udh: UdhView | null
   rawPduHex: string
@@ -84,6 +87,37 @@ export async function getMessage(id: string): Promise<MessageDetail> {
 export async function clearMessages(): Promise<void> {
   const res = await fetch('/api/v1/messages', { method: 'DELETE' })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+}
+
+export async function getRules(): Promise<string> {
+  const res = await fetch('/api/v1/rules')
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  return res.text()
+}
+
+export async function putRules(yaml: string): Promise<{ rules: number }> {
+  const res = await fetch('/api/v1/rules', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/yaml' },
+    body: yaml,
+  })
+  if (!res.ok) {
+    let detail = `${res.status} ${res.statusText}`
+    try {
+      const body = await res.json()
+      if (body.detail) detail = body.detail
+    } catch {
+      /* not json */
+    }
+    throw new Error(detail)
+  }
+  return res.json()
+}
+
+export function statusClass(status: string): string {
+  if (status === 'DELIVRD') return 'ok'
+  if (status === 'ACCEPTED' || status === 'ACCEPTD' || status === 'ENROUTE' || status === 'UNKNOWN') return 'pending'
+  return 'bad'
 }
 
 export function matches(m: MessageSummary, q: string): boolean {

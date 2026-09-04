@@ -6,10 +6,12 @@
     getMessage,
     listMessages,
     matches,
+    statusClass,
     type MessageDetail,
     type MessageSummary,
   } from './lib/api'
   import Detail from './lib/MessageDetail.svelte'
+  import RulesPanel from './lib/RulesPanel.svelte'
 
   let messages: MessageSummary[] = $state([])
   let total = $state(0)
@@ -18,6 +20,7 @@
   let query = $state('')
   let selectedId: string | null = $state(null)
   let detail: MessageDetail | null = $state(null)
+  let showRules = $state(false)
 
   let searchTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -106,8 +109,13 @@
   <span class="spacer"></span>
   <span class="status" class:live>{live ? 'live' : 'reconnecting'}</span>
   <span class="count">{total} message{total === 1 ? '' : 's'}</span>
+  <button onclick={() => (showRules = !showRules)} class:active={showRules}>Rules</button>
   <button onclick={clear} disabled={total === 0}>Clear inbox</button>
 </header>
+
+{#if showRules}
+  <RulesPanel onclose={() => (showRules = false)} />
+{/if}
 
 <div class="layout" class:split={selectedId !== null}>
   <main>
@@ -135,6 +143,7 @@
             <th>From</th>
             <th>To</th>
             <th class="text">Text</th>
+            <th>Status</th>
             <th>Encoding</th>
           </tr>
         </thead>
@@ -157,6 +166,7 @@
                   >
                 {/if}
               </td>
+              <td><span class="badge status {statusClass(m.status)}">{m.status}</span></td>
               <td class="muted">{m.encoding}</td>
             </tr>
           {/each}

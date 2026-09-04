@@ -5,7 +5,9 @@ import io.netty.channel.Channel;
 
 import java.net.InetSocketAddress;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -17,6 +19,7 @@ public final class SmppSession {
     private final Instant connectedAt;
     private final AtomicLong submitted = new AtomicLong();
     private final AtomicInteger sequence = new AtomicInteger();
+    private final Map<Integer, String> awaitingReceiptAck = new ConcurrentHashMap<>();
     private volatile Account account;
     private volatile BindType bindType;
     private volatile Instant boundAt;
@@ -72,6 +75,16 @@ public final class SmppSession {
     /** Next sequence number for a PDU the SMSC originates on this session. */
     public int nextSequence() {
         return sequence.incrementAndGet();
+    }
+
+    /** Remembers that the deliver_sm with this sequence number carries the receipt for a part. */
+    public void expectReceiptAck(int sequenceNumber, String segmentMessageId) {
+        awaitingReceiptAck.put(sequenceNumber, segmentMessageId);
+    }
+
+    /** The part whose receipt the ESME just acknowledged, if the sequence number is one we sent. */
+    public Optional<String> receiptAcked(int sequenceNumber) {
+        return Optional.ofNullable(awaitingReceiptAck.remove(sequenceNumber));
     }
 
     void countSubmit() {

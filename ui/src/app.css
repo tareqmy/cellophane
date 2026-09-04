@@ -219,6 +219,31 @@ td.text {
   color: var(--muted);
 }
 
+.badge.status {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+}
+
+.badge.status.ok {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.badge.status.bad {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.badge.status.pending {
+  color: var(--muted);
+}
+
+button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .badge.parts {
   margin-left: 0.5rem;
   color: var(--accent);

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.cellophane.server.api.MessageSummary;
 import io.cellophane.server.api.MessagesPage;
 import io.cellophane.server.api.SendRequest;
+import io.cellophane.server.api.SendResponse;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -62,7 +63,7 @@ class ApiIntegrationTest {
 
         MessageSummary sent = http().post().uri("/api/v1/send").contentType(MediaType.APPLICATION_JSON)
                 .body(new SendRequest("MyApp", "8801711111111", "Your OTP is 482913"))
-                .retrieve().body(MessageSummary.class);
+                .retrieve().body(SendResponse.class).message();
 
         assertThat(sent.account()).isEqualTo("http");
         assertThat(sent.text()).isEqualTo("Your OTP is 482913");

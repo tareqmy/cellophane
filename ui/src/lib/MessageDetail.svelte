@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatDateTime, type MessageDetail, type SegmentView } from './api'
+  import { formatDateTime, statusClass, type MessageDetail, type SegmentView } from './api'
   import HexDump from './HexDump.svelte'
 
   let { detail }: { detail: MessageDetail } = $props()
@@ -18,6 +18,21 @@
   function isOpen(seg: SegmentView) {
     return openPdu[seg.messageId] ?? detail.segments.length === 1
   }
+
+  const timeline = $derived(
+    detail.segments
+      .flatMap((s) => s.events.map((e) => ({ ...e, part: s.sequence })))
+      .sort((a, b) => a.at.localeCompare(b.at)),
+  )
+
+  function clock(iso: string) {
+    const d = new Date(iso)
+    return `${d.toLocaleTimeString([], { hour12: false })}.${String(d.getMilliseconds()).padStart(3, '0')}`
+  }
+
+  function label(type: string) {
+    return type.replace('DLR_', 'receipt ').toLowerCase()
+  }
 </script>
 
 <article class="detail">
@@ -35,7 +50,7 @@
       <dt>Encoding</dt>
       <dd>{detail.encoding} <span class="muted">(data_coding 0x{detail.dataCoding.toString(16).padStart(2, '0')})</span></dd>
       <dt>Status</dt>
-      <dd>{detail.status}</dd>
+      <dd><span class="badge status {statusClass(detail.status)}">{detail.status}</span></dd>
       {#if detail.parts > 1}
         <dt>Parts</dt>
         <dd>
@@ -59,6 +74,22 @@
     {/if}
   </section>
 
+  <section>
+    <h3>Timeline</h3>
+    <ol class="timeline">
+      {#each timeline as e}
+        <li class={e.type.toLowerCase()}>
+          <span class="mono muted when">{clock(e.at)}</span>
+          <span class="what">{label(e.type)}</span>
+          {#if detail.parts > 1}
+            <span class="badge">part {e.part}</span>
+          {/if}
+          <span class="muted">{e.detail}</span>
+        </li>
+      {/each}
+    </ol>
+  </section>
+
   {#each detail.segments as seg (seg.messageId)}
     <section class="segment">
       <h3>
@@ -67,6 +98,7 @@
         {:else}
           PDU
         {/if}
+        <span class="badge status {statusClass(seg.status)}">{seg.status}</span>
         <span class="muted small">
           submit_sm seq {seg.pdu.sequenceNumber} · session {seg.sessionId} · message_id
           <span class="mono">{seg.messageId}</span>
@@ -157,6 +189,38 @@
     text-transform: none;
     letter-spacing: 0;
     font-weight: normal;
+  }
+  .timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem 0.75rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 12.5px;
+  }
+  .timeline li {
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .timeline li:last-child {
+    border-bottom: none;
+  }
+  .timeline .what {
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .timeline li.rejected .what,
+  .timeline li.dlr_queued .what {
+    color: var(--warn);
+  }
+  .timeline li.dlr_sent .what,
+  .timeline li.dlr_acked .what,
+  .timeline li.dlr_simulated .what {
+    color: var(--ok);
   }
   .text {
     white-space: pre-wrap;

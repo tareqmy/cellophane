@@ -1,5 +1,6 @@
 package io.cellophane.server.api;
 
+import io.cellophane.server.message.Event;
 import io.cellophane.server.message.Message;
 import io.cellophane.server.message.Segment;
 import io.cellophane.smpp.codec.PduAnnotator;
@@ -62,11 +63,20 @@ public record MessageDetail(String id, Instant receivedAt, Instant updatedAt, St
         }
     }
 
+    /** A timeline entry. */
+    public record EventView(Instant at, String type, String detail) {
+        static EventView of(Event e) {
+            return new EventView(e.at(), e.type().name(), e.detail());
+        }
+    }
+
     public record SegmentView(String messageId, int sequence, Instant receivedAt, String sessionId, String text,
-                              PduView pdu, UdhView udh, String rawPduHex, List<FieldView> fields) {
+                              String status, List<EventView> events, PduView pdu, UdhView udh, String rawPduHex,
+                              List<FieldView> fields) {
         static SegmentView of(Segment s) {
             return new SegmentView(s.messageId(), s.sequence(), s.receivedAt(), s.sessionId(), s.text(),
-                    PduView.of(s.pdu()), s.udh() == null ? null : UdhView.of(s.udh()), HEX.formatHex(s.rawPdu()),
+                    s.status().name(), s.events().stream().map(EventView::of).toList(), PduView.of(s.pdu()),
+                    s.udh() == null ? null : UdhView.of(s.udh()), HEX.formatHex(s.rawPdu()),
                     PduAnnotator.annotate(s.rawPdu()).stream().map(FieldView::of).toList());
         }
     }

@@ -1,7 +1,8 @@
 package io.cellophane.server.smpp;
 
 import io.cellophane.server.account.AccountRegistry;
-import io.cellophane.server.message.Inbox;
+import io.cellophane.server.operator.Operator;
+import io.cellophane.server.operator.ReceiptDispatcher;
 import io.cellophane.smpp.codec.SmppPipeline;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
@@ -28,19 +29,22 @@ public final class SmppServer implements SmartLifecycle {
     private final String systemId;
     private final AccountRegistry accounts;
     private final SessionRegistry sessions;
-    private final Inbox inbox;
+    private final Operator operator;
+    private final ReceiptDispatcher receipts;
 
     private EventLoopGroup boss;
     private EventLoopGroup workers;
     private Channel listener;
     private volatile int port = -1;
 
-    public SmppServer(int port, String systemId, AccountRegistry accounts, SessionRegistry sessions, Inbox inbox) {
+    public SmppServer(int port, String systemId, AccountRegistry accounts, SessionRegistry sessions,
+                      Operator operator, ReceiptDispatcher receipts) {
         this.configuredPort = port;
         this.systemId = systemId;
         this.accounts = accounts;
         this.sessions = sessions;
-        this.inbox = inbox;
+        this.operator = operator;
+        this.receipts = receipts;
     }
 
     @Override
@@ -61,7 +65,7 @@ public final class SmppServer implements SmartLifecycle {
                         SmppPipeline.install(ch.pipeline());
                         ch.pipeline().addAfter(SmppPipeline.FRAME_DECODER, "raw-pdu-capture", new RawPduCapture());
                         ch.pipeline().addLast("smpp-session", new SmppSessionHandler(systemId, accounts, sessions,
-                                inbox));
+                                operator, receipts));
                     }
                 });
         listener = bootstrap.bind(configuredPort).syncUninterruptibly().channel();

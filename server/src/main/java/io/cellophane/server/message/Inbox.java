@@ -19,8 +19,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Turns accepted submits into stored, decoded messages, reassembling concatenated parts, and tells listeners.
- * Parts are matched on account, sender, recipient and concat reference, from either a UDH or the SAR TLVs.
+ * Turns accepted (or rejected) submits into stored, decoded messages, reassembling concatenated parts, records
+ * what later happens to each part, and tells listeners. Parts are matched on account, sender, recipient and
+ * concat reference, from either a UDH or the SAR TLVs.
  */
 public final class Inbox {
 
@@ -45,8 +46,12 @@ public final class Inbox {
         }
     };
 
-    /** The outcome of accepting one submit: the logical message and the part it became. */
+    /** The outcome of storing one submit: the logical message and the part it became. */
     public record Accepted(Message message, Segment segment) {
+    }
+
+    /** What the codec makes of a submit's user data. */
+    public record Decoded(String text, String encoding, Udh udh, Optional<Udh.Concat> concat) {
     }
 
     private record ConcatKey(String account, String from, String to, int reference, int total) {
@@ -58,8 +63,8 @@ public final class Inbox {
         this.clock = clock;
     }
 
-    /** Decodes and stores a submit_sm the operator accepted. */
-    public synchronized Accepted receive(String account, String sessionId, SubmitSm pdu, byte[] rawPdu) {
+    /** Decodes text, UDH and concatenation info without storing anything. */
+    public static Decoded decode(SubmitSm pdu) {
         byte[] payload = pdu.payload();
         byte[] body = payload;
         Udh udh = null;
@@ -73,10 +78,22 @@ public final class Inbox {
         }
         String encoding = DataCoding.alphabet(pdu.dataCoding()).label();
         String text = SmsText.decode(pdu.dataCoding(), body).orElse(null);
+        return new Decoded(text, encoding, udh, concatOf(pdu, udh));
+    }
+
+    /** Stores a submit as accepted with no further history; used where no operator decision is involved. */
+    public Accepted receive(String account, String sessionId, SubmitSm pdu, byte[] rawPdu) {
+        return receive(account, sessionId, pdu, rawPdu, decode(pdu), MessageStatus.ACCEPTED,
+                new Event(clock.instant(), EventType.ACCEPTED, "submit_sm_resp ESME_ROK"));
+    }
+
+    /** Stores a submit with the operator's verdict as the first timeline entry. */
+    public synchronized Accepted receive(String account, String sessionId, SubmitSm pdu, byte[] rawPdu,
+                                         Decoded decoded, MessageStatus status, Event first) {
         Instant now = clock.instant();
-        Optional<Udh.Concat> concat = concatOf(pdu, udh);
+        Optional<Udh.Concat> concat = decoded.concat();
         Segment segment = new Segment(Ids.newId(now.toEpochMilli()), concat.map(Udh.Concat::sequence).orElse(1),
-                now, sessionId, pdu, rawPdu, udh, text);
+                now, sessionId, pdu, rawPdu, decoded.udh(), decoded.text(), status, List.of(first));
 
         if (concat.isPresent()) {
             Udh.Concat c = concat.get();
@@ -96,7 +113,7 @@ public final class Inbox {
                     return new Accepted(updated, segment);
                 }
             }
-            Message message = Message.of(account, encoding, c.reference(), c.total(), segment);
+            Message message = Message.of(account, decoded.encoding(), c.reference(), c.total(), segment);
             store.add(message);
             if (message.isComplete()) {
                 pending.remove(key);
@@ -107,12 +124,34 @@ public final class Inbox {
             return new Accepted(message, segment);
         }
 
-        Message message = Message.of(account, encoding, null, 1, segment);
+        Message message = Message.of(account, decoded.encoding(), null, 1, segment);
         store.add(message);
-        log.debug("[{}] {} -> {} ({}): {}", sessionId, message.from().address(), message.to().address(), encoding,
-                text);
+        log.debug("[{}] {} -> {} ({}): {}", sessionId, message.from().address(), message.to().address(),
+                decoded.encoding(), decoded.text());
         listener.onMessage(message);
         return new Accepted(message, segment);
+    }
+
+    /**
+     * Appends an event to a part's timeline, optionally moving it to a new status. Silently ignored if the
+     * message has since been evicted or cleared.
+     */
+    public synchronized Optional<Message> record(String segmentMessageId, EventType type, String detail,
+                                                 MessageStatus newStatus) {
+        Instant now = clock.instant();
+        Optional<Message> found = store.findBySegment(segmentMessageId);
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+        Message message = found.get();
+        Segment segment = message.segments().stream().filter(s -> s.messageId().equals(segmentMessageId))
+                .findFirst().orElseThrow();
+        Message updated = message.withSegmentReplaced(segment.with(new Event(now, type, detail), newStatus), now);
+        if (!store.update(updated)) {
+            return Optional.empty();
+        }
+        listener.onUpdated(updated);
+        return Optional.of(updated);
     }
 
     /** Concatenation info from the UDH, or failing that from the SAR optional parameters. */
@@ -134,14 +173,19 @@ public final class Inbox {
         return Optional.empty();
     }
 
-    /** Builds an equivalent submit_sm for a message sent over HTTP and stores it like any other. */
-    public Message receiveHttp(String from, String to, String text) {
+    /** Builds the submit_sm an HTTP send is equivalent to, so it can go through the operator like any other. */
+    public static SubmitSm httpSubmit(String from, String to, String text) {
         int dataCoding = SmsText.chooseDataCoding(text);
         byte[] userData = SmsText.encode(dataCoding, text);
         byte[] shortMessage = userData.length <= 255 ? userData : new byte[0];
         List<Tlv> tlvs = userData.length <= 255 ? List.of() : List.of(new Tlv(Tlv.Tag.MESSAGE_PAYLOAD, userData));
-        SubmitSm pdu = new SubmitSm(0, "", address(from), address(to), 0, 0, 0, "", "", 0, 0, dataCoding, 0,
-                shortMessage, tlvs);
+        return new SubmitSm(0, "", address(from), address(to), 0, 0, 0, "", "", 1, 0, dataCoding, 0, shortMessage,
+                tlvs);
+    }
+
+    /** Stores an HTTP send as plainly accepted, bypassing the operator's rules. */
+    public Message receiveHttp(String from, String to, String text) {
+        SubmitSm pdu = httpSubmit(from, to, text);
         return receive(HTTP_ACCOUNT, HTTP_ACCOUNT, pdu, PduCodec.encode(pdu)).message();
     }
 

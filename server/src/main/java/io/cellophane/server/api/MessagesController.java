@@ -4,6 +4,8 @@ import io.cellophane.server.message.Inbox;
 import io.cellophane.server.message.MessageQuery;
 import io.cellophane.server.message.MessageStore;
 import io.cellophane.server.message.Since;
+import io.cellophane.server.operator.Operator;
+import io.cellophane.smpp.CommandStatus;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,12 +31,14 @@ class MessagesController {
     private final MessageStore store;
     private final Inbox inbox;
     private final MessageEvents events;
+    private final Operator operator;
     private final Clock clock;
 
-    MessagesController(MessageStore store, Inbox inbox, MessageEvents events, Clock clock) {
+    MessagesController(MessageStore store, Inbox inbox, MessageEvents events, Operator operator, Clock clock) {
         this.store = store;
         this.inbox = inbox;
         this.events = events;
+        this.operator = operator;
         this.clock = clock;
     }
 
@@ -75,13 +79,16 @@ class MessagesController {
         return events.subscribe();
     }
 
+    /** Sends through the operator's rules like an SMPP submit; a rejected message is still stored and returned. */
     @PostMapping("/send")
     @ResponseStatus(HttpStatus.CREATED)
-    MessageSummary send(@RequestBody SendRequest request) {
+    SendResponse send(@RequestBody SendRequest request) {
         if (isBlank(request.from()) || isBlank(request.to()) || request.text() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from, to and text are required");
         }
-        return MessageSummary.of(inbox.receiveHttp(request.from().trim(), request.to().trim(), request.text()));
+        Operator.Outcome outcome = operator.sendHttp(request.from().trim(), request.to().trim(), request.text());
+        return new SendResponse(MessageSummary.of(outcome.accepted().message()),
+                CommandStatus.describe(outcome.commandStatus()), outcome.decision().rule());
     }
 
     private static boolean isBlank(String s) {
