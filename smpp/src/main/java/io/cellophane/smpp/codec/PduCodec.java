@@ -47,16 +47,6 @@ import java.util.Optional;
  */
 public final class PduCodec {
 
-    // Maximum field lengths in characters, excluding the NUL terminator (spec section 4).
-    private static final int MAX_SYSTEM_ID = 15;
-    private static final int MAX_PASSWORD = 8;
-    private static final int MAX_SYSTEM_TYPE = 12;
-    private static final int MAX_ADDRESS_RANGE = 40;
-    private static final int MAX_SERVICE_TYPE = 5;
-    private static final int MAX_ADDRESS = 20;
-    private static final int MAX_TIME = 16;
-    private static final int MAX_MESSAGE_ID = 64;
-
     private PduCodec() {
     }
 
@@ -112,16 +102,16 @@ public final class PduCodec {
     }
 
     private static Bind decodeBind(CommandId command, int seq, ByteBuf body) {
-        String systemId = Octets.readCString(body, MAX_SYSTEM_ID, ESME_RINVSYSID);
-        String password = Octets.readCString(body, MAX_PASSWORD, ESME_RINVPASWD);
-        String systemType = Octets.readCString(body, MAX_SYSTEM_TYPE, ESME_RINVSYSTYP);
+        String systemId = Octets.readCString(body, ESME_RINVSYSID);
+        String password = Octets.readCString(body, ESME_RINVPASWD);
+        String systemType = Octets.readCString(body, ESME_RINVSYSTYP);
         int interfaceVersion = body.readUnsignedByte();
-        Address addressRange = readAddress(body, MAX_ADDRESS_RANGE, ESME_RINVSRCADR);
+        Address addressRange = readAddress(body, ESME_RINVSRCADR);
         return new Bind(command, seq, systemId, password, systemType, interfaceVersion, addressRange);
     }
 
     private static BindResp decodeBindResp(CommandId command, int status, int seq, ByteBuf body) {
-        String systemId = body.isReadable() ? Octets.readCString(body, MAX_SYSTEM_ID, ESME_RINVSYSID) : "";
+        String systemId = body.isReadable() ? Octets.readCString(body, ESME_RINVSYSID) : "";
         return new BindResp(command, status, seq, systemId, readTlvs(body));
     }
 
@@ -140,13 +130,13 @@ public final class PduCodec {
     }
 
     private static SubmitSmResp decodeSubmitSmResp(int status, int seq, ByteBuf body) {
-        String messageId = body.isReadable() ? Octets.readCString(body, MAX_MESSAGE_ID, ESME_RINVMSGID) : "";
+        String messageId = body.isReadable() ? Octets.readCString(body, ESME_RINVMSGID) : "";
         return new SubmitSmResp(status, seq, messageId, readTlvs(body));
     }
 
     private static DeliverSmResp decodeDeliverSmResp(int status, int seq, ByteBuf body) {
         if (body.isReadable()) {
-            Octets.readCString(body, MAX_MESSAGE_ID, ESME_RINVMSGID); // always empty in 3.4; tolerated and ignored
+            Octets.readCString(body, ESME_RINVMSGID); // always empty in 3.4; tolerated and ignored
         }
         readTlvs(body);
         return new DeliverSmResp(status, seq);
@@ -159,14 +149,14 @@ public final class PduCodec {
     }
 
     private static MessageBody readMessageBody(ByteBuf body) {
-        String serviceType = Octets.readCString(body, MAX_SERVICE_TYPE, ESME_RINVSERTYP);
-        Address source = readAddress(body, MAX_ADDRESS, ESME_RINVSRCADR);
-        Address destination = readAddress(body, MAX_ADDRESS, ESME_RINVDSTADR);
+        String serviceType = Octets.readCString(body, ESME_RINVSERTYP);
+        Address source = readAddress(body, ESME_RINVSRCADR);
+        Address destination = readAddress(body, ESME_RINVDSTADR);
         int esmClass = body.readUnsignedByte();
         int protocolId = body.readUnsignedByte();
         int priorityFlag = body.readUnsignedByte();
-        String scheduleDeliveryTime = Octets.readCString(body, MAX_TIME, ESME_RINVSCHED);
-        String validityPeriod = Octets.readCString(body, MAX_TIME, ESME_RINVEXPIRY);
+        String scheduleDeliveryTime = Octets.readCString(body, ESME_RINVSCHED);
+        String validityPeriod = Octets.readCString(body, ESME_RINVEXPIRY);
         int registeredDelivery = body.readUnsignedByte();
         int replaceIfPresent = body.readUnsignedByte();
         int dataCoding = body.readUnsignedByte();
@@ -182,10 +172,10 @@ public final class PduCodec {
                 smDefaultMsgId, shortMessage, readTlvs(body));
     }
 
-    private static Address readAddress(ByteBuf body, int maxLength, io.cellophane.smpp.CommandStatus error) {
+    private static Address readAddress(ByteBuf body, io.cellophane.smpp.CommandStatus error) {
         int ton = body.readUnsignedByte();
         int npi = body.readUnsignedByte();
-        return new Address(ton, npi, Octets.readCString(body, maxLength, error));
+        return new Address(ton, npi, Octets.readCString(body, error));
     }
 
     private static List<Tlv> readTlvs(ByteBuf body) {

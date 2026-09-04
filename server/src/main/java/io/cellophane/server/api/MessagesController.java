@@ -1,0 +1,89 @@
+package io.cellophane.server.api;
+
+import io.cellophane.server.message.Inbox;
+import io.cellophane.server.message.MessageQuery;
+import io.cellophane.server.message.MessageStore;
+import io.cellophane.server.message.Since;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.time.Clock;
+import java.time.Instant;
+
+/** The inbox over HTTP: search, fetch, clear, live stream, and the non-SMPP send endpoint. */
+@RestController
+@RequestMapping("/api/v1")
+class MessagesController {
+
+    private final MessageStore store;
+    private final Inbox inbox;
+    private final MessageEvents events;
+    private final Clock clock;
+
+    MessagesController(MessageStore store, Inbox inbox, MessageEvents events, Clock clock) {
+        this.store = store;
+        this.inbox = inbox;
+        this.events = events;
+        this.clock = clock;
+    }
+
+    @GetMapping("/messages")
+    MessagesPage list(@RequestParam(required = false) String to,
+                      @RequestParam(required = false) String from,
+                      @RequestParam(required = false) String text,
+                      @RequestParam(required = false) String account,
+                      @RequestParam(required = false) String since,
+                      @RequestParam(defaultValue = "0") int offset,
+                      @RequestParam(defaultValue = "" + MessageQuery.DEFAULT_LIMIT) int limit) {
+        MessageQuery query;
+        try {
+            Instant sinceInstant = since == null || since.isBlank() ? null : Since.parse(since, clock);
+            query = new MessageQuery(to, from, text, account, sinceInstant, offset, limit);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+        MessageStore.Page page = store.list(query);
+        return new MessagesPage(page.total(), page.messages().stream().map(MessageSummary::of).toList());
+    }
+
+    @GetMapping("/messages/{id}")
+    MessageDetail get(@PathVariable String id) {
+        return store.get(id).map(MessageDetail::of)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no message " + id));
+    }
+
+    @DeleteMapping("/messages")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void clear() {
+        inbox.clear();
+    }
+
+    @GetMapping(value = "/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    SseEmitter stream() {
+        return events.subscribe();
+    }
+
+    @PostMapping("/send")
+    @ResponseStatus(HttpStatus.CREATED)
+    MessageSummary send(@RequestBody SendRequest request) {
+        if (isBlank(request.from()) || isBlank(request.to()) || request.text() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from, to and text are required");
+        }
+        return MessageSummary.of(inbox.receiveHttp(request.from().trim(), request.to().trim(), request.text()));
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+}

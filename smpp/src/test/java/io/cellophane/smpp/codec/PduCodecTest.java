@@ -144,10 +144,17 @@ class PduCodecTest {
     }
 
     @Test
-    void reportsOverlongSystemIdWithTheMatchingStatus() {
-        Bind bind = new Bind(CommandId.BIND_TRANSCEIVER, 1, "sixteen-chars-id", "pw", "", 0x34, Address.empty());
+    void acceptsFieldsLongerThanTheSpecMaximum() {
+        Bind bind = new Bind(CommandId.BIND_TRANSCEIVER, 1, "cellophane", "cellophane", "", 0x34, Address.empty());
 
-        assertThatThrownBy(() -> PduCodec.decode(Unpooled.wrappedBuffer(PduCodec.encode(bind))))
+        assertThat(PduCodec.decode(Unpooled.wrappedBuffer(PduCodec.encode(bind)))).isEqualTo(bind);
+    }
+
+    @Test
+    void reportsUnterminatedStringWithTheFieldStatus() {
+        byte[] wire = HEX.parseHex("00000015" + "00000009" + "00000000" + "00000001" + "6162636465");
+
+        assertThatThrownBy(() -> PduCodec.decode(Unpooled.wrappedBuffer(wire)))
                 .isInstanceOfSatisfying(PduException.class,
                         e -> assertThat(e.commandStatus()).isEqualTo(CommandStatus.ESME_RINVSYSID.code()));
     }

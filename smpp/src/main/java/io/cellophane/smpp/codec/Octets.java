@@ -16,18 +16,15 @@ final class Octets {
     }
 
     /**
-     * Reads a NUL-terminated string.
+     * Reads a NUL-terminated string. Length limits from the spec are deliberately not enforced: real operators
+     * accept over-long fields (the README's own default password is ten characters) and a test double should too.
      *
-     * @param maxLength maximum number of characters excluding the terminator
-     * @param error     status to report if the string is missing its terminator or too long
+     * @param error status to report if the string is missing its terminator
      */
-    static String readCString(ByteBuf in, int maxLength, CommandStatus error) {
+    static String readCString(ByteBuf in, CommandStatus error) {
         int length = in.bytesBefore((byte) 0);
         if (length < 0) {
             throw new PduException(error, "unterminated C-octet string");
-        }
-        if (length > maxLength) {
-            throw new PduException(error, "C-octet string of " + length + " chars exceeds max " + maxLength);
         }
         String value = in.toString(in.readerIndex(), length, CHARSET);
         in.skipBytes(length + 1);
