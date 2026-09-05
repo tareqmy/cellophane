@@ -40,6 +40,11 @@ public final class RuleEngine {
         return current.get().yaml();
     }
 
+    public Decision decide(RuleContext ctx, Gates gates) {
+        return current().decide(ctx, gates);
+    }
+
+    /** Evaluates with gates that never trigger. */
     public Decision decide(RuleContext ctx) {
         return current().decide(ctx);
     }

@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.random.RandomGenerator;
 
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,24 @@ class OperatorTest {
 
     private final List<Delivered> delivered = new ArrayList<>();
     private final ManualTimer timer = new ManualTimer();
+    private final AtomicReference<Instant> now = new AtomicReference<>(T0.plusSeconds(2));
+    private final Clock movable = new Clock() {
+        @Override
+        public java.time.ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(java.time.ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now.get();
+        }
+    };
+    private final Metrics metrics = new Metrics(movable);
     private final MessageStore store = new MessageStore(100);
     private final Inbox inbox = new Inbox(store, new MessageListener() {
         @Override
@@ -78,7 +97,7 @@ class OperatorTest {
     private Operator operator(String rulesYaml) {
         return new Operator(RuleEngine.fromYaml(rulesYaml), inbox,
                 (account, segmentId, receipt, state) -> delivered.add(new Delivered(account, segmentId, receipt, state)),
-                timer, Clock.fixed(T0.plusSeconds(2), ZoneOffset.UTC), RandomGenerator.of("L64X128MixRandom"));
+                timer, movable, RandomGenerator.of("L64X128MixRandom"), metrics);
     }
 
     private static SubmitSm submit(String to, String text, int registeredDelivery) {
@@ -202,6 +221,69 @@ class OperatorTest {
         assertThat(rejected.accepted().message().account()).isEqualTo(Inbox.HTTP_ACCOUNT);
         assertThat(accepted.commandStatus()).isZero();
         assertThat(lastEvent(accepted).type()).as("HTTP sends ask for a receipt").isEqualTo(EventType.DLR_SCHEDULED);
+    }
+
+    @Test
+    void throttleCountsPerAccountPerSecondThenRejects() {
+        Operator op = operator("rules:\n  - match: { to: '^88015' }\n    throttle: { tps: 2 }\n"
+                + "  - accept: { dlr: none }");
+
+        assertThat(send(op, submit("8801511111111", "1", 0)).commandStatus()).isZero();
+        assertThat(send(op, submit("8801511111111", "2", 0)).commandStatus()).isZero();
+        Operator.Outcome third = send(op, submit("8801511111111", "3", 0));
+        assertThat(third.commandStatus()).isEqualTo(CommandStatus.ESME_RTHROTTLED.code());
+        assertThat(third.decision().rule()).isEqualTo("rule 1");
+        assertThat(store.get(third.accepted().message().id()).orElseThrow().status()).isEqualTo(MessageStatus.REJECTED);
+        assertThat(op.onSubmit("other", "s9", submit("8801511111111", "4", 0), new byte[0]).commandStatus())
+                .as("another account has its own window").isZero();
+        assertThat(send(op, submit("15551234567", "5", 0)).commandStatus()).as("unmatched recipient").isZero();
+
+        now.set(now.get().plusSeconds(1));
+        assertThat(send(op, submit("8801511111111", "6", 0)).commandStatus()).as("new second").isZero();
+        assertThat(metrics.snapshot().rejected()).isEqualTo(1);
+        assertThat(metrics.snapshot().submitted()).isEqualTo(6);
+    }
+
+    @Test
+    void latencyAndDisconnectAreReportedAndRecorded() {
+        Operator op = operator("rules:\n  - name: slow\n    latency: 300ms\n  - name: drop\n    disconnect: { after: 2 }\n"
+                + "  - accept: { dlr: none }");
+
+        Operator.Outcome first = send(op, submit("1", "a", 0));
+        Operator.Outcome second = send(op, submit("1", "b", 0));
+        Operator.Outcome otherSession = op.onSubmit("app", "s2", submit("1", "c", 0), new byte[0]);
+
+        assertThat(first.latency()).isEqualTo(Duration.ofMillis(300));
+        assertThat(first.disconnect()).isFalse();
+        assertThat(second.disconnect()).isTrue();
+        assertThat(otherSession.disconnect()).as("counted per session").isFalse();
+        assertThat(events(first)).extracting(e -> e.type()).containsExactly(EventType.ACCEPTED, EventType.DLR_SKIPPED,
+                EventType.DELAYED);
+        assertThat(events(second)).extracting(e -> e.type()).contains(EventType.DISCONNECTED);
+        assertThat(events(second).getLast().detail()).isEqualTo("connection dropped after the response (rules: slow, drop)");
+
+        op.sessionClosed("s1");
+        Operator.Outcome afterRebind = send(op, submit("1", "d", 0));
+        assertThat(afterRebind.disconnect()).as("counter reset when the session closed").isFalse();
+    }
+
+    @Test
+    void receiptIsTimedFromTheDelayedResponse() {
+        Operator op = operator("rules:\n  - latency: 300ms\n  - accept: { dlr: DELIVRD, after: 100ms }");
+
+        Operator.Outcome out = send(op, submit("1", "a", 1));
+
+        assertThat(out.latency()).isEqualTo(Duration.ofMillis(300));
+        assertThat(timer.tasks).hasSize(1);
+        assertThat(timer.tasks.getFirst().delay()).isEqualTo(Duration.ofMillis(400));
+        assertThat(lastEvent(out).detail()).isEqualTo("submit_sm_resp held for 300ms (rules: rule 1)");
+        assertThat(events(out).get(1).detail()).isEqualTo("DELIVRD in 100ms after the response");
+    }
+
+    private List<io.cellophane.server.message.Event> events(Operator.Outcome out) {
+        return store.findBySegment(out.accepted().segment().messageId()).orElseThrow().segments().stream()
+                .filter(s -> s.messageId().equals(out.accepted().segment().messageId())).findFirst().orElseThrow()
+                .events();
     }
 
     private io.cellophane.server.message.Event lastEvent(Operator.Outcome out) {

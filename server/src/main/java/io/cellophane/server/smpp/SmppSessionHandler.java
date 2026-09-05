@@ -21,6 +21,7 @@ import io.cellophane.smpp.pdu.EnquireLink;
 import io.cellophane.smpp.pdu.GenericNack;
 import io.cellophane.smpp.pdu.Pdu;
 import io.cellophane.smpp.pdu.SubmitSm;
+import io.cellophane.smpp.pdu.SubmitSmResp;
 import io.cellophane.smpp.pdu.Tlv;
 import io.cellophane.smpp.pdu.Unbind;
 import io.cellophane.smpp.pdu.UnknownPdu;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /** The fake operator's side of one ESME connection: authenticates binds and accepts submits into the inbox. */
 final class SmppSessionHandler extends SimpleChannelInboundHandler<Pdu> {
@@ -65,6 +67,7 @@ final class SmppSessionHandler extends SimpleChannelInboundHandler<Pdu> {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         sessions.close(session);
+        operator.sessionClosed(session.id());
         log.info("[{}] ESME disconnected", session.id());
         super.channelInactive(ctx);
     }
@@ -126,7 +129,20 @@ final class SmppSessionHandler extends SimpleChannelInboundHandler<Pdu> {
         Operator.Outcome outcome = operator.onSubmit(session.account().orElseThrow().systemId(), session.id(),
                 submit, raw != null ? raw : PduCodec.encode(submit));
         session.countSubmit();
-        ctx.writeAndFlush(submit.respond(outcome.commandStatus(), outcome.messageId()));
+        SubmitSmResp resp = submit.respond(outcome.commandStatus(), outcome.messageId());
+        Runnable reply = () -> {
+            ChannelFuture written = ctx.writeAndFlush(resp);
+            if (outcome.disconnect()) {
+                log.info("[{}] dropping the connection after seq {} as the rules demand", session.id(),
+                        submit.sequenceNumber());
+                written.addListener(ChannelFutureListener.CLOSE);
+            }
+        };
+        if (outcome.latency().isZero()) {
+            reply.run();
+        } else {
+            ctx.executor().schedule(reply, outcome.latency().toMillis(), TimeUnit.MILLISECONDS);
+        }
     }
 
     @Override

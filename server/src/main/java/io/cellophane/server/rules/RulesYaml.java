@@ -24,16 +24,21 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  *   - match: { to: "^88019" }
  *     accept:
  *       dlr: [ { DELIVRD: 80%, after: 3s }, { UNDELIV: 20%, after: 30s } ]
+ *   - match: { to: "^88015" }
+ *     throttle: { tps: 5, then: ESME_RTHROTTLED }
  *   - match: { text: "(?i)spam" }
  *     reject: ESME_RINVDSTADR
+ *   - match: { account: "chaos" }
+ *     disconnect: { after: 10 }
+ *   - match: { account: "slow" }
+ *     latency: 1s-3s
  *   - default:
  *       accept: { dlr: DELIVRD, after: 500ms }
  * </pre>
  */
 public final class RulesYaml {
 
-    private static final Set<String> ACTIONS = Set.of("accept", "reject");
-    private static final Set<String> PLANNED = Set.of("throttle", "latency", "disconnect");
+    private static final Set<String> ACTIONS = Set.of("accept", "reject", "throttle", "latency", "disconnect");
     private static final Set<String> MATCH_KEYS = Set.of("to", "from", "account", "text");
 
     private RulesYaml() {
@@ -75,6 +80,9 @@ public final class RulesYaml {
                     throw new RulesException(where + ": 'default' cannot be combined with other keys");
                 }
                 defaultAction = action(item.get("default"), where + " (default)");
+                if (!defaultAction.isTerminal()) {
+                    throw new RulesException(where + " (default): the default must accept or reject");
+                }
                 continue;
             }
             Match match = item.containsKey("match") ? match(item.get("match"), where) : Match.ANY;
@@ -116,20 +124,80 @@ public final class RulesYaml {
 
     private static RuleAction action(Object node, String where) {
         if (!(node instanceof Map<?, ?> map) || map.isEmpty()) {
-            throw new RulesException(where + ": needs exactly one action (accept or reject)");
+            throw new RulesException(where + ": needs exactly one action (" + String.join(", ", ACTION_NAMES) + ")");
         }
         if (map.size() != 1) {
             throw new RulesException(where + ": has several actions " + map.keySet() + "; use one");
         }
         String key = String.valueOf(map.keySet().iterator().next());
         Object value = map.get(key);
-        if (PLANNED.contains(key)) {
-            throw new RulesException(where + ": action '" + key + "' is not supported yet");
-        }
         if (!ACTIONS.contains(key)) {
-            throw new RulesException(where + ": unknown action '" + key + "' (use accept or reject)");
+            throw new RulesException(where + ": unknown action '" + key + "' (use " + String.join(", ", ACTION_NAMES)
+                    + ")");
         }
-        return key.equals("accept") ? accept(value, where) : reject(value, where);
+        return switch (key) {
+            case "accept" -> accept(value, where);
+            case "reject" -> reject(value, where);
+            case "throttle" -> throttle(value, where);
+            case "latency" -> latency(value, where);
+            default -> disconnect(value, where);
+        };
+    }
+
+    private static final List<String> ACTION_NAMES = List.of("accept", "reject", "throttle", "latency",
+            "disconnect");
+
+    private static Throttle throttle(Object value, String where) {
+        int tps;
+        int status = CommandStatus.ESME_RTHROTTLED.code();
+        if (value instanceof Number n) {
+            tps = n.intValue();
+        } else if (value instanceof Map<?, ?> map) {
+            for (Object key : map.keySet()) {
+                if (!Set.of("tps", "then").contains(String.valueOf(key))) {
+                    throw new RulesException(where + ": unknown throttle option '" + key + "' (use tps, then)");
+                }
+            }
+            if (!(map.get("tps") instanceof Number n)) {
+                throw new RulesException(where + ": throttle needs a numeric 'tps'");
+            }
+            tps = n.intValue();
+            if (map.get("then") != null) {
+                status = reject(map.get("then"), where).commandStatus();
+            }
+        } else {
+            throw new RulesException(where + ": 'throttle' must be like { tps: 5, then: ESME_RTHROTTLED }");
+        }
+        if (tps < 1) {
+            throw new RulesException(where + ": throttle tps must be at least 1");
+        }
+        return new Throttle(tps, status);
+    }
+
+    private static Latency latency(Object value, String where) {
+        Object raw = value;
+        if (value instanceof Map<?, ?> map) {
+            raw = map.containsKey("delay") ? map.get("delay") : map.get("after");
+        }
+        if (raw == null) {
+            throw new RulesException(where + ": 'latency' needs a delay such as 2s or 1s-5s");
+        }
+        Delay delay = delay(raw, where);
+        if (delay.isZero()) {
+            throw new RulesException(where + ": latency delay must be greater than zero");
+        }
+        return new Latency(delay);
+    }
+
+    private static Disconnect disconnect(Object value, String where) {
+        Object raw = value instanceof Map<?, ?> map ? map.get("after") : value;
+        if (raw == null) {
+            return new Disconnect(1);
+        }
+        if (raw instanceof Number n && n.intValue() >= 1) {
+            return new Disconnect(n.intValue());
+        }
+        throw new RulesException(where + ": 'disconnect' takes { after: N } with N at least 1");
     }
 
     private static Accept accept(Object value, String where) {
@@ -293,6 +361,10 @@ public final class RulesYaml {
     private static void appendAction(StringBuilder sb, RuleAction action, String indent) {
         switch (action) {
             case Reject r -> sb.append("reject: ").append(CommandStatus.describe(r.commandStatus())).append("\n");
+            case Throttle t -> sb.append("throttle: { tps: ").append(t.tps()).append(", then: ")
+                    .append(CommandStatus.describe(t.status())).append(" }\n");
+            case Latency l -> sb.append("latency: ").append(l.delay()).append("\n");
+            case Disconnect d -> sb.append("disconnect: { after: ").append(d.after()).append(" }\n");
             case Accept a -> {
                 if (a.outcomes().size() == 1) {
                     Accept.Outcome o = a.outcomes().getFirst();

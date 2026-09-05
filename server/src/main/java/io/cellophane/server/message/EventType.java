@@ -6,6 +6,10 @@ public enum EventType {
     ACCEPTED,
     /** submit_sm answered with an error status. */
     REJECTED,
+    /** The response was held back by a latency rule. */
+    DELAYED,
+    /** The connection was dropped after the response, by a disconnect rule. */
+    DISCONNECTED,
     /** A delivery receipt has been decided on and will be sent after a delay. */
     DLR_SCHEDULED,
     /** No receipt will be sent, and why. */

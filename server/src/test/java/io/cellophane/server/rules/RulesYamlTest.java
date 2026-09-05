@@ -87,6 +87,35 @@ class RulesYamlTest {
     }
 
     @Test
+    void parsesGateActions() {
+        RuleSet set = RulesYaml.parse("""
+                rules:
+                  - match: { to: "^88015" }
+                    throttle: { tps: 5, then: ESME_RTHROTTLED }
+                  - throttle: 3
+                  - throttle: { tps: 2, then: 0x14 }
+                  - latency: 2s
+                  - latency: { delay: 1s-3s }
+                  - latency: { after: 250ms }
+                  - match: { account: chaos }
+                    disconnect: { after: 10 }
+                  - disconnect:
+                  - disconnect: 2
+                """);
+
+        assertThat(set.rules()).extracting(Rule::action).containsExactly(
+                Throttle.of(5), Throttle.of(3), new Throttle(2, CommandStatus.ESME_RMSGQFUL.code()),
+                new Latency(Delay.fixed(Duration.ofSeconds(2))),
+                new Latency(new Delay(Duration.ofSeconds(1), Duration.ofSeconds(3))),
+                new Latency(Delay.fixed(Duration.ofMillis(250))),
+                new Disconnect(10), new Disconnect(1), new Disconnect(2));
+        String yaml = RulesYaml.format(set);
+        assertThat(yaml).contains("throttle: { tps: 5, then: ESME_RTHROTTLED }").contains("latency: 1s-3s")
+                .contains("disconnect: { after: 10 }");
+        assertThat(RulesYaml.parse(yaml)).isEqualTo(set);
+    }
+
+    @Test
     void emptyDocumentsMeanTheBuiltInDefault() {
         assertThat(RulesYaml.parse("")).isEqualTo(RuleSet.DEFAULT);
         assertThat(RulesYaml.parse("rules:")).isEqualTo(RuleSet.DEFAULT);
@@ -101,8 +130,18 @@ class RulesYamlTest {
                 .hasMessageContaining("unknown match field 'dest'");
         assertThatThrownBy(() -> RulesYaml.parse("rules:\n  - accept:\n    reject: 1"))
                 .hasMessageContaining("several actions");
-        assertThatThrownBy(() -> RulesYaml.parse("rules:\n  - throttle: { tps: 5 }"))
-                .hasMessageContaining("'throttle' is not supported yet");
+        assertThatThrownBy(() -> RulesYaml.parse("rules:\n  - throttle: { tps: 0 }"))
+                .hasMessageContaining("tps must be at least 1");
+        assertThatThrownBy(() -> RulesYaml.parse("rules:\n  - throttle: { speed: 5 }"))
+                .hasMessageContaining("unknown throttle option 'speed'");
+        assertThatThrownBy(() -> RulesYaml.parse("rules:\n  - latency: 0s"))
+                .hasMessageContaining("greater than zero");
+        assertThatThrownBy(() -> RulesYaml.parse("rules:\n  - latency:"))
+                .hasMessageContaining("'latency' needs a delay");
+        assertThatThrownBy(() -> RulesYaml.parse("rules:\n  - disconnect: { after: 0 }"))
+                .hasMessageContaining("at least 1");
+        assertThatThrownBy(() -> RulesYaml.parse("rules:\n  - default:\n      latency: 1s"))
+                .hasMessageContaining("default must accept or reject");
         assertThatThrownBy(() -> RulesYaml.parse("rules:\n  - explode: now"))
                 .hasMessageContaining("unknown action 'explode'");
         assertThatThrownBy(() -> RulesYaml.parse("rules:\n  - accept: { dlr: MAYBE }"))

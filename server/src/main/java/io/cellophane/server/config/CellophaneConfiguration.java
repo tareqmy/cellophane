@@ -6,6 +6,8 @@ import io.cellophane.server.api.MessageEvents;
 import io.cellophane.server.message.Inbox;
 import io.cellophane.server.message.MessageStore;
 import io.cellophane.server.operator.DelayedExecutor;
+import io.cellophane.server.operator.Metrics;
+import io.cellophane.server.operator.MoInjector;
 import io.cellophane.server.operator.Operator;
 import io.cellophane.server.operator.ReceiptDispatcher;
 import io.cellophane.server.operator.ScheduledDelayedExecutor;
@@ -87,13 +89,24 @@ class CellophaneConfiguration {
     }
 
     @Bean
-    ReceiptDispatcher receiptDispatcher(SessionRegistry sessions, Inbox inbox) {
-        return new ReceiptDispatcher(sessions, inbox);
+    Metrics metrics(Clock clock) {
+        return new Metrics(clock);
     }
 
     @Bean
-    Operator operator(RuleEngine rules, Inbox inbox, ReceiptDispatcher receipts, DelayedExecutor timer, Clock clock) {
-        return new Operator(rules, inbox, receipts, timer, clock, RandomGenerator.getDefault());
+    ReceiptDispatcher receiptDispatcher(SessionRegistry sessions, Inbox inbox, Metrics metrics) {
+        return new ReceiptDispatcher(sessions, inbox, metrics);
+    }
+
+    @Bean
+    Operator operator(RuleEngine rules, Inbox inbox, ReceiptDispatcher receipts, DelayedExecutor timer, Clock clock,
+                      Metrics metrics) {
+        return new Operator(rules, inbox, receipts, timer, clock, RandomGenerator.getDefault(), metrics);
+    }
+
+    @Bean
+    MoInjector moInjector(SessionRegistry sessions, Metrics metrics) {
+        return new MoInjector(sessions, metrics);
     }
 
     @Bean

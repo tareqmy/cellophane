@@ -33,11 +33,13 @@ public final class ReceiptDispatcher implements ReceiptSink {
 
     private final SessionRegistry sessions;
     private final Inbox inbox;
+    private final Metrics metrics;
     private final Map<String, Deque<Pending>> queued = new HashMap<>();
 
-    public ReceiptDispatcher(SessionRegistry sessions, Inbox inbox) {
+    public ReceiptDispatcher(SessionRegistry sessions, Inbox inbox, Metrics metrics) {
         this.sessions = sessions;
         this.inbox = inbox;
+        this.metrics = metrics;
     }
 
     @Override
@@ -98,6 +100,7 @@ public final class ReceiptDispatcher implements ReceiptSink {
         int seq = session.nextSequence();
         session.expectReceiptAck(seq, p.segmentMessageId());
         session.channel().writeAndFlush(p.receipt().withSequenceNumber(seq));
+        metrics.receiptSent();
         inbox.record(p.segmentMessageId(), EventType.DLR_SENT,
                 "deliver_sm stat:" + p.state().stat() + " to " + session.id() + " seq " + seq,
                 MessageStatus.of(p.state()));

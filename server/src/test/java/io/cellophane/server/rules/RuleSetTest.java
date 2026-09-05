@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 class RuleSetTest {
 
     private static RuleContext ctx(String account, String from, String to, String text) {
-        return new RuleContext(account, from, to, text);
+        return new RuleContext(account, "s1", from, to, text);
     }
 
     @Test
@@ -37,6 +37,57 @@ class RuleSetTest {
         assertThat(fallback.rule()).isEqualTo("default");
         assertThat(fallback.action()).isEqualTo(Accept.receipt(DeliveryReceipt.State.DELIVERED,
                 Duration.ofMillis(500)));
+    }
+
+    @Test
+    void gatesApplyTheirEffectAndFallThrough() {
+        RuleSet set = RulesYaml.parse("""
+                rules:
+                  - name: slow
+                    match: { account: slow }
+                    latency: 2s
+                  - name: flaky-link
+                    match: { account: slow }
+                    disconnect: { after: 3 }
+                  - name: limited
+                    match: { to: "^88015" }
+                    throttle: { tps: 5, then: ESME_RMSGQFUL }
+                  - name: ok
+                    match: { to: "^8801" }
+                    accept: { dlr: DELIVRD }
+                """);
+        Gates never = Gates.NONE;
+        Gates always = new Gates() {
+            @Override
+            public boolean overThrottle(Rule rule, Throttle throttle, RuleContext ctx) {
+                return true;
+            }
+
+            @Override
+            public boolean disconnectDue(Rule rule, Disconnect disconnect, RuleContext ctx) {
+                return true;
+            }
+        };
+
+        Decision under = set.decide(ctx("slow", "A", "8801511111111", "x"), never);
+        assertThat(under.rule()).isEqualTo("ok");
+        assertThat(under.action()).isEqualTo(Accept.receipt(DeliveryReceipt.State.DELIVERED, Duration.ZERO));
+        assertThat(under.latency()).isEqualTo(Duration.ofSeconds(2));
+        assertThat(under.disconnect()).isFalse();
+        assertThat(under.path()).containsExactly("slow", "flaky-link", "limited", "ok");
+
+        Decision over = set.decide(ctx("slow", "A", "8801511111111", "x"), always);
+        assertThat(over.rule()).isEqualTo("limited");
+        assertThat(over.action()).isEqualTo(Reject.with(CommandStatus.ESME_RMSGQFUL));
+        assertThat(over.latency()).isEqualTo(Duration.ofSeconds(2));
+        assertThat(over.disconnect()).isTrue();
+        assertThat(over.path()).containsExactly("slow", "flaky-link", "limited");
+
+        Decision plain = set.decide(ctx("app", "A", "15551234567", "x"), always);
+        assertThat(plain.rule()).isEqualTo("default");
+        assertThat(plain.latency()).isZero();
+        assertThat(plain.disconnect()).isFalse();
+        assertThat(plain.path()).containsExactly("default");
     }
 
     @Test
