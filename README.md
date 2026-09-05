@@ -7,10 +7,10 @@
 <p align="center"><strong>Mailpit for SMS.</strong> The see-through SMSC — a fake mobile operator with a real inbox.</p>
 
 <p align="center">
-  <a href="https://github.com/YOU/cellophane/releases"><img src="https://img.shields.io/github/v/release/YOU/cellophane" alt="release"></a>
-  <a href="https://github.com/YOU/cellophane/pkgs/container/cellophane"><img src="https://img.shields.io/badge/ghcr.io-cellophane-blue" alt="container"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/YOU/cellophane" alt="MIT"></a>
-  <a href="https://github.com/YOU/cellophane/actions"><img src="https://github.com/YOU/cellophane/actions/workflows/build.yml/badge.svg" alt="build"></a>
+  <a href="https://github.com/tareqmy/cellophane/releases"><img src="https://img.shields.io/github/v/release/tareqmy/cellophane" alt="release"></a>
+  <a href="https://github.com/tareqmy/cellophane/pkgs/container/cellophane"><img src="https://img.shields.io/badge/ghcr.io-cellophane-blue" alt="container"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/tareqmy/cellophane" alt="MIT"></a>
+  <a href="https://github.com/tareqmy/cellophane/actions"><img src="https://github.com/tareqmy/cellophane/actions/workflows/build.yml/badge.svg" alt="build"></a>
 </p>
 
 ---
@@ -26,7 +26,7 @@ No SIM cards, no per-message cost, no "please don't run the load test against th
 ## Quick start
 
 ```bash
-docker run -p 2775:2775 -p 8025:8025 ghcr.io/YOU/cellophane
+docker run -p 2775:2775 -p 8025:8025 ghcr.io/tareqmy/cellophane
 ```
 
 Open **http://localhost:8025**. Bind your SMPP client to `localhost:2775` with system_id `cellophane` and password `cellophane`, or just:
@@ -119,7 +119,7 @@ Everything has a sensible default. Override with environment variables or a moun
 # docker-compose.yml
 services:
   cellophane:
-    image: ghcr.io/YOU/cellophane
+    image: ghcr.io/tareqmy/cellophane
     ports: ["2775:2775", "8025:8025"]
     environment:
       CELLOPHANE_ACCOUNTS: "app:secret:100,chaos:chaos:10"
@@ -142,4 +142,4 @@ Bug reports, operator quirks you have suffered in production, and PRs are all we
 
 ## Licence
 
-MIT. Built by [Tareq](https://github.com/YOU), who has spent too many evenings wondering why an operator returned `ESME_RMSGQFUL`.
+MIT. Built by [Tareq](https://github.com/tareqmy), who has spent too many evenings wondering why an operator returned `ESME_RMSGQFUL`.

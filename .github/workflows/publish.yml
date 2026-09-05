@@ -1,7 +1,8 @@
 name: publish
 
 # Tag a release as v1.2.3 to build the image and push it to GHCR as
-# ghcr.io/<owner>/cellophane:1.2.3 and :latest.
+# ghcr.io/<owner>/cellophane:1.2.3 and :latest. If the repository has DOCKERHUB_USERNAME and
+# DOCKERHUB_TOKEN secrets, the same image is also pushed to Docker Hub as <username>/cellophane.
 on:
   push:
     tags: ['v*']
@@ -44,3 +45,15 @@ jobs:
           -Drevision=${{ steps.meta.outputs.version }}
           -Dimage.repository=${{ steps.meta.outputs.image }}
           -Dimage.publish=true
+
+      - name: Also push to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          for tag in ${{ steps.meta.outputs.version }} latest; do
+            docker tag ${{ steps.meta.outputs.image }}:$tag docker.io/$DOCKERHUB_USERNAME/cellophane:$tag
+            docker push docker.io/$DOCKERHUB_USERNAME/cellophane:$tag
+          done

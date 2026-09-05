@@ -30,5 +30,5 @@ First release: a fake mobile operator with a real inbox.
 - Container image built with Paketo buildpacks (`ghcr.io/<owner>/cellophane`), GitHub Actions for build and
   publish, examples for docker-compose, CI assertions, node-smpp and cloudhopper.
 
-[Unreleased]: https://github.com/YOU/cellophane/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/YOU/cellophane/releases/tag/v0.1.0
+[Unreleased]: https://github.com/tareqmy/cellophane/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/tareqmy/cellophane/releases/tag/v0.1.0

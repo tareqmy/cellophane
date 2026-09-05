@@ -3,7 +3,7 @@
 Ready-to-run setups against a local Cellophane. Start one first:
 
 ```bash
-docker run -p 2775:2775 -p 8025:8025 ghcr.io/YOU/cellophane
+docker run -p 2775:2775 -p 8025:8025 ghcr.io/tareqmy/cellophane
 # or, from a checkout:
 ./mvnw -DskipTests package && java -jar server/target/cellophane-server-*.jar
 ```

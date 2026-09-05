@@ -10,7 +10,7 @@
 
   <name>Cellophane</name>
   <description>Mailpit for SMS: a fake SMPP operator with a real inbox.</description>
-  <url>https://github.com/YOU/cellophane</url>
+  <url>https://github.com/tareqmy/cellophane</url>
   <licenses>
     <license>
       <name>MIT License</name>

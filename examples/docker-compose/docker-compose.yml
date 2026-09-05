@@ -1,6 +1,6 @@
 services:
   cellophane:
-    image: ghcr.io/YOU/cellophane
+    image: ghcr.io/tareqmy/cellophane
     ports:
       - "2775:2775"   # SMPP
       - "8025:8025"   # web UI + API

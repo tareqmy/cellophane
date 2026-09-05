@@ -1,0 +1,24 @@
+name: Operator quirk
+description: A real-world operator behaviour Cellophane should be able to simulate
+labels: [operator-quirk, enhancement]
+body:
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: What the operator does
+      description: >
+        Describe the behaviour as precisely as you can: which PDU, which status codes, timing, whether it
+        depends on load or destination, what the receipt looks like. Real hex is gold.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: What it broke or nearly broke
+      description: How your application or gateway reacted, and what you had to change.
+  - type: textarea
+    id: rule
+    attributes:
+      label: How you would like to express it as a rule
+      description: A sketch in the YAML rule syntax is welcome but not required.
+      render: yaml

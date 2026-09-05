@@ -1,0 +1,38 @@
+name: Bug report
+description: Something does not work the way the docs say
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Cellophane version
+      description: Image tag or `git describe`; the UI shows it in the stats endpoint too.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: pdu
+    attributes:
+      label: PDU or API exchange
+      description: >
+        If SMPP is involved, paste the raw PDU hex from the message detail pane (or the client's log) so the
+        bytes can be reproduced exactly. If the API is involved, the request and response.
+      render: text
+  - type: textarea
+    id: rules
+    attributes:
+      label: Rules in effect
+      description: Output of `curl localhost:8025/api/v1/rules`, if rules are involved.
+      render: yaml
+  - type: input
+    id: client
+    attributes:
+      label: SMPP client
+      placeholder: cloudhopper 5.0.9, node-smpp 0.6, Jasmin 0.10, ...
