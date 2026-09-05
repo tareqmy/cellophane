@@ -87,8 +87,8 @@ reject: { status: 88 }
 
 ### `throttle`
 
-Allow `tps` matching submits per account per wall-clock second; answer the rest with `then` (default
-`ESME_RTHROTTLED`). Submits under the limit continue to the following rules.
+Allow `tps` matching submits per account within any sliding one-second window; answer the rest with `then`
+(default `ESME_RTHROTTLED`). Submits under the limit continue to the following rules.
 
 ```yaml
 throttle: { tps: 5 }
@@ -119,3 +119,14 @@ disconnect: { after: 10 }
 Every decision is written to the message's timeline in the UI and in `GET /api/v1/messages/{id}`: which rule
 answered, when the receipt was scheduled and sent, whether the response was held or the link dropped. Rejected and
 undeliverable messages get red badges in the list, so the effect of a rule is visible without reading logs.
+
+## Behaviour that is not a rule
+
+Two operator behaviours apply before any rule is consulted, because they are properties of the link rather than
+of the message:
+
+- **Window.** Each account in `CELLOPHANE_ACCOUNTS` has a window (`system_id:password:window`, default 10). A
+  session with that many submits still unanswered gets `ESME_RMSGQFUL` for the next one. You will only see this
+  with a `latency` rule or a very fast client, which is exactly when real operators return it.
+- **Idle timeout.** A bind that sends nothing, not even `enquire_link`, for `CELLOPHANE_IDLE_TIMEOUT` (default
+  `2m`) is closed. Set it to `0` to keep silent binds forever.

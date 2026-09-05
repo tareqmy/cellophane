@@ -44,7 +44,7 @@ import org.springframework.web.client.RestClient;
 
 /** Throttle, latency and disconnect rules, MO injection and stats, against a cloudhopper client. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"cellophane.smpp-port=0", "cellophane.accounts=app:secret,other:secret"})
+        properties = {"cellophane.smpp-port=0", "cellophane.accounts=app:secret,other:secret,narrow:secret:2"})
 class ChaosIntegrationTest {
 
     static final String RULES = """
@@ -97,6 +97,7 @@ class ChaosIntegrationTest {
         config.setConnectTimeout(5000);
         config.setBindTimeout(5000);
         config.setRequestExpiryTimeout(5000);
+        config.setWindowSize(10);
         config.getLoggingOptions().setLogBytes(false);
         SmppSession session = client.bind(config, new DefaultSmppSessionHandler() {
             @Override
@@ -189,6 +190,30 @@ class ChaosIntegrationTest {
         assertThat(again.submit(submit("15551234567", "drop me 1 again"), 5000).getCommandStatus())
                 .as("a fresh bind starts counting again").isZero();
         assertThat(again.isBound()).isTrue();
+    }
+
+    @Test
+    void submitsBeyondTheAccountWindowGetMessageQueueFull() throws Exception {
+        SmppSession session = bind(SmppBindType.TRANSCEIVER, "narrow"); // window 2
+        List<com.cloudhopper.commons.util.windowing.WindowFuture<Integer, PduRequest, PduResponse>> futures = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            // slow lane: the response is held for 400ms, so these four overlap on the wire
+            futures.add(session.sendRequestPdu(submit("8801611111111", "burst " + i), 5000, false));
+        }
+        List<Integer> statuses = new ArrayList<>();
+        for (var f : futures) {
+            f.await(5000);
+            statuses.add(f.getResponse().getCommandStatus());
+        }
+
+        assertThat(statuses).filteredOn(st -> st == SmppConstants.STATUS_OK).hasSize(2);
+        assertThat(statuses).filteredOn(st -> st == SmppConstants.STATUS_MSGQFUL).hasSize(2);
+        Map<String, Object> page = http.get().uri("/api/v1/messages?status=rejected&account=narrow").retrieve()
+                .body(new ParameterizedTypeReference<>() { });
+        assertThat(page.get("total")).isEqualTo(2);
+
+        // once the window drains, the session is usable again
+        assertThat(session.submit(submit("15551234567", "after"), 5000).getCommandStatus()).isZero();
     }
 
     @Test

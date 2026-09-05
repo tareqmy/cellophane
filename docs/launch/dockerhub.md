@@ -29,6 +29,7 @@ the connection.
 | `CELLOPHANE_ACCOUNTS` | `cellophane:cellophane` | Comma-separated `system_id:password[:window]` |
 | `CELLOPHANE_RULES` | – | Path to a mounted rules YAML file |
 | `CELLOPHANE_MAX_MESSAGES` | `10000` | In-memory inbox size |
+| `CELLOPHANE_IDLE_TIMEOUT` | `2m` | Drop binds that stay silent this long; `0` disables |
 
 ## Tags
 

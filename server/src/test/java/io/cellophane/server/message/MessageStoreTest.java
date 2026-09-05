@@ -80,27 +80,46 @@ class MessageStoreTest {
             in.receive(i < 3 ? "app" : "chaos", "s1", pdu, PduCodec.encode(pdu));
         }
 
-        MessageStore.Page odd = big.list(new MessageQuery(null, null, "odd", null, null, null, 0, 10));
+        MessageStore.Page odd = big.list(new MessageQuery(null, null, "odd", null, null, null, null, 0, 10));
         assertThat(odd.total()).isEqualTo(2);
         assertThat(odd.messages()).extracting(Message::text).containsExactly("OTP 3", "OTP 1");
 
-        MessageStore.Page to = big.list(new MessageQuery(null, "880172", null, "otp", "app", null, 0, 10));
+        MessageStore.Page to = big.list(new MessageQuery(null, "880172", null, "otp", "app", null, null, 0, 10));
         assertThat(to.messages()).extracting(Message::text).containsExactly("OTP 2");
 
-        MessageStore.Page any = big.list(new MessageQuery("even", null, null, null, null, null, 0, 10));
+        MessageStore.Page any = big.list(new MessageQuery("even", null, null, null, null, null, null, 0, 10));
         assertThat(any.total()).isEqualTo(3);
-        assertThat(big.list(new MessageQuery("880174", null, null, null, null, null, 0, 10)).total()).isEqualTo(1);
-        assertThat(big.list(new MessageQuery("otp 1", null, null, null, null, null, 0, 10)).total()).isEqualTo(1);
+        assertThat(big.list(new MessageQuery("880174", null, null, null, null, null, null, 0, 10)).total()).isEqualTo(1);
+        assertThat(big.list(new MessageQuery("otp 1", null, null, null, null, null, null, 0, 10)).total()).isEqualTo(1);
 
-        MessageStore.Page paged = big.list(new MessageQuery(null, null, null, null, null, null, 1, 2));
+        MessageStore.Page paged = big.list(new MessageQuery(null, null, null, null, null, null, null, 1, 2));
         assertThat(paged.total()).isEqualTo(5);
         assertThat(paged.messages()).extracting(Message::text).containsExactly("OTP 3", "OTP 2");
 
-        MessageStore.Page since = big.list(new MessageQuery(null, null, null, null, null, T0.plusSeconds(1), 0, 10));
+        MessageStore.Page since = big.list(new MessageQuery(null, null, null, null, null, null, T0.plusSeconds(1), 0, 10));
         assertThat(since.total()).isZero();
 
-        assertThatThrownBy(() -> new MessageQuery(null, null, null, null, null, null, 0, 0))
+        assertThatThrownBy(() -> new MessageQuery(null, null, null, null, null, null, null, 0, 0))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void filtersByStatus() {
+        MessageStore big = new MessageStore(100);
+        Inbox in = new Inbox(big, new RecordingListener(), clock);
+        SubmitSm ok = SubmitSm.of(1, Address.alphanumeric("A"), Address.international("1"), 0, Gsm7.encode("ok"));
+        SubmitSm bad = SubmitSm.of(2, Address.alphanumeric("A"), Address.international("1"), 0, Gsm7.encode("bad"));
+        in.receive("app", "s1", ok, PduCodec.encode(ok));
+        Inbox.Accepted rejected = in.receive("app", "s1", bad, PduCodec.encode(bad), Inbox.decode(bad),
+                MessageStatus.REJECTED, new Event(T0, EventType.REJECTED, "test"));
+        in.record(rejected.segment().messageId(), EventType.DLR_SIMULATED, "x", null);
+
+        assertThat(big.list(new MessageQuery(null, null, null, null, null, java.util.Set.of(MessageStatus.REJECTED),
+                null, 0, 10)).messages()).extracting(Message::text).containsExactly("bad");
+        assertThat(big.list(new MessageQuery(null, null, null, null, null, java.util.Set.of(MessageStatus.ACCEPTED,
+                MessageStatus.DELIVRD), null, 0, 10)).messages()).extracting(Message::text).containsExactly("ok");
+        assertThat(big.list(new MessageQuery(null, null, null, null, null, java.util.Set.of(), null, 0, 10)).total())
+                .as("empty set means no filter").isEqualTo(2);
     }
 
     @Test

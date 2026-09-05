@@ -94,13 +94,17 @@ h1 {
   margin-right: 1rem;
 }
 
-input[type='search'] {
+input[type='search'],
+header select {
   font: inherit;
   padding: 0.35rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--bg);
   color: var(--fg);
+}
+
+input[type='search'] {
   width: 22rem;
   max-width: 40vw;
 }

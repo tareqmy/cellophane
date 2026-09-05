@@ -26,7 +26,7 @@ public final class Metrics {
         submitted.incrementAndGet();
         (wasAccepted ? accepted : rejected).incrementAndGet();
         long second = clock.instant().getEpochSecond();
-        int slot = (int) Math.floorMod(second, WINDOW_SECONDS);
+        int slot = Math.floorMod(second, WINDOW_SECONDS);
         if (perSecondStamp.get(slot) != second) {
             perSecondStamp.set(slot, second);
             perSecond.set(slot, 0);

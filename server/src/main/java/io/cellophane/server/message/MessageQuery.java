@@ -2,13 +2,14 @@ package io.cellophane.server.message;
 
 import java.time.Instant;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Inbox search. {@code q} matches sender, recipient or text; the named fields narrow further. Text matching is
- * case-insensitive containment, account is exact, nulls match everything.
+ * case-insensitive containment, account is exact, {@code statuses} is any-of; nulls (or an empty set) match all.
  */
-public record MessageQuery(String q, String to, String from, String text, String account, Instant since, int offset,
-                           int limit) {
+public record MessageQuery(String q, String to, String from, String text, String account, Set<MessageStatus> statuses,
+                           Instant since, int offset, int limit) {
 
     public static final int DEFAULT_LIMIT = 50;
     public static final int MAX_LIMIT = 1000;
@@ -23,7 +24,7 @@ public record MessageQuery(String q, String to, String from, String text, String
     }
 
     public static MessageQuery all(int limit) {
-        return new MessageQuery(null, null, null, null, null, null, 0, limit);
+        return new MessageQuery(null, null, null, null, null, null, null, 0, limit);
     }
 
     public boolean matches(Message m) {
@@ -32,6 +33,7 @@ public record MessageQuery(String q, String to, String from, String text, String
                 && contains(m.from().address(), from)
                 && contains(m.text(), text)
                 && (account == null || account.equals(m.account()))
+                && (statuses == null || statuses.isEmpty() || statuses.contains(m.status()))
                 && (since == null || !m.receivedAt().isBefore(since));
     }
 

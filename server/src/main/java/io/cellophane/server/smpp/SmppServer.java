@@ -13,11 +13,13 @@ import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.timeout.IdleStateHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
 
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /** The Netty listener that plays the mobile operator. Started and stopped with the Spring context. */
@@ -26,6 +28,7 @@ public final class SmppServer implements SmartLifecycle {
     private static final Logger log = LoggerFactory.getLogger(SmppServer.class);
 
     private final int configuredPort;
+    private final Duration idleTimeout;
     private final String systemId;
     private final AccountRegistry accounts;
     private final SessionRegistry sessions;
@@ -37,9 +40,13 @@ public final class SmppServer implements SmartLifecycle {
     private Channel listener;
     private volatile int port = -1;
 
-    public SmppServer(int port, String systemId, AccountRegistry accounts, SessionRegistry sessions,
-                      Operator operator, ReceiptDispatcher receipts) {
+    /**
+     * @param idleTimeout close a connection that has sent nothing for this long; zero disables the check
+     */
+    public SmppServer(int port, Duration idleTimeout, String systemId, AccountRegistry accounts,
+                      SessionRegistry sessions, Operator operator, ReceiptDispatcher receipts) {
         this.configuredPort = port;
+        this.idleTimeout = idleTimeout;
         this.systemId = systemId;
         this.accounts = accounts;
         this.sessions = sessions;
@@ -64,14 +71,18 @@ public final class SmppServer implements SmartLifecycle {
                     protected void initChannel(SocketChannel ch) {
                         SmppPipeline.install(ch.pipeline());
                         ch.pipeline().addAfter(SmppPipeline.FRAME_DECODER, "raw-pdu-capture", new RawPduCapture());
+                        if (!idleTimeout.isZero()) {
+                            ch.pipeline().addLast("idle", new IdleStateHandler(idleTimeout.toMillis(), 0, 0,
+                                    java.util.concurrent.TimeUnit.MILLISECONDS));
+                        }
                         ch.pipeline().addLast("smpp-session", new SmppSessionHandler(systemId, accounts, sessions,
                                 operator, receipts));
                     }
                 });
         listener = bootstrap.bind(configuredPort).syncUninterruptibly().channel();
         port = ((InetSocketAddress) listener.localAddress()).getPort();
-        log.info("SMPP 3.4 listening on port {} as system_id '{}' with {} account(s)", port, systemId,
-                accounts.all().size());
+        log.info("SMPP 3.4 listening on port {} as system_id '{}' with {} account(s), idle timeout {}", port,
+                systemId, accounts.all().size(), idleTimeout.isZero() ? "off" : idleTimeout);
     }
 
     @Override

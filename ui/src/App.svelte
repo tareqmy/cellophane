@@ -7,6 +7,7 @@
     listMessages,
     matches,
     statusClass,
+    STATUS_FILTERS,
     type MessageDetail,
     type MessageSummary,
   } from './lib/api'
@@ -19,6 +20,7 @@
   let live = $state(false)
   let error: string | null = $state(null)
   let query = $state('')
+  let statusFilter = $state(0)
   let selectedId: string | null = $state(null)
   let detail: MessageDetail | null = $state(null)
   let showRules = $state(false)
@@ -33,7 +35,7 @@
 
   async function load() {
     try {
-      const page = await listMessages(query)
+      const page = await listMessages(query, STATUS_FILTERS[statusFilter].statuses)
       messages = page.messages
       total = page.total
       error = null
@@ -73,10 +75,18 @@
   }
 
   function upsert(m: MessageSummary, isNew: boolean) {
+    const statuses = STATUS_FILTERS[statusFilter].statuses
     const i = messages.findIndex((x) => x.id === m.id)
+    const fits = matches(m, query, statuses)
     if (i >= 0) {
-      messages[i] = m
-    } else if (isNew && matches(m, query)) {
+      if (fits) {
+        messages[i] = m
+      } else {
+        // its status moved out of the current filter
+        messages = messages.filter((x) => x.id !== m.id)
+        total = Math.max(0, total - 1)
+      }
+    } else if (fits && (isNew || statuses.length)) {
       messages = [m, ...messages].slice(0, 500)
       total += 1
     }
@@ -121,6 +131,18 @@
     value={query}
     oninput={(e) => search((e.target as HTMLInputElement).value)}
   />
+  <select
+    aria-label="Filter by status"
+    value={statusFilter}
+    onchange={(e) => {
+      statusFilter = Number((e.target as HTMLSelectElement).value)
+      load()
+    }}
+  >
+    {#each STATUS_FILTERS as f, i}
+      <option value={i}>{f.label}</option>
+    {/each}
+  </select>
   <span class="spacer"></span>
   <span class="status" class:live>{live ? 'live' : 'reconnecting'}</span>
   <span class="count">{total} message{total === 1 ? '' : 's'}</span>
@@ -143,8 +165,8 @@
 
     {#if messages.length === 0}
       <section class="empty">
-        {#if query}
-          <p>Nothing matches “{query}”.</p>
+        {#if query || statusFilter !== 0}
+          <p>Nothing matches{query ? ` “${query}”` : ''}{statusFilter !== 0 ? ` with status “${STATUS_FILTERS[statusFilter].label}”` : ''}.</p>
         {:else}
           <p>No messages yet. Bind an SMPP client to port <code>2775</code>, or try:</p>
           <pre>curl -X POST localhost:8025/api/v1/send \

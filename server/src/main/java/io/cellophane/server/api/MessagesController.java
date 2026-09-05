@@ -2,6 +2,7 @@ package io.cellophane.server.api;
 
 import io.cellophane.server.message.Inbox;
 import io.cellophane.server.message.MessageQuery;
+import io.cellophane.server.message.MessageStatus;
 import io.cellophane.server.message.MessageStore;
 import io.cellophane.server.message.Since;
 import io.cellophane.server.operator.Operator;
@@ -22,6 +23,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Locale;
+import java.util.Set;
 
 /** The inbox over HTTP: search, fetch, clear, live stream, and the non-SMPP send endpoint. */
 @RestController
@@ -48,13 +52,14 @@ class MessagesController {
                       @RequestParam(required = false) String from,
                       @RequestParam(required = false) String text,
                       @RequestParam(required = false) String account,
+                      @RequestParam(required = false) String status,
                       @RequestParam(required = false) String since,
                       @RequestParam(defaultValue = "0") int offset,
                       @RequestParam(defaultValue = "" + MessageQuery.DEFAULT_LIMIT) int limit) {
         MessageQuery query;
         try {
             Instant sinceInstant = since == null || since.isBlank() ? null : Since.parse(since, clock);
-            query = new MessageQuery(q, to, from, text, account, sinceInstant, offset, limit);
+            query = new MessageQuery(q, to, from, text, account, statuses(status), sinceInstant, offset, limit);
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
@@ -89,6 +94,23 @@ class MessagesController {
         Operator.Outcome outcome = operator.sendHttp(request.from().trim(), request.to().trim(), request.text());
         return new SendResponse(MessageSummary.of(outcome.accepted().message()),
                 CommandStatus.describe(outcome.commandStatus()), outcome.decision().rule());
+    }
+
+    /** {@code status=REJECTED} or {@code status=UNDELIV,EXPIRED}; case-insensitive. */
+    private static Set<MessageStatus> statuses(String param) {
+        if (param == null || param.isBlank()) {
+            return null;
+        }
+        Set<MessageStatus> set = EnumSet.noneOf(MessageStatus.class);
+        for (String token : param.split(",")) {
+            try {
+                set.add(MessageStatus.valueOf(token.trim().toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("unknown status '" + token.trim() + "'; use one of "
+                        + java.util.Arrays.toString(MessageStatus.values()));
+            }
+        }
+        return set;
     }
 
     private static boolean isBlank(String s) {

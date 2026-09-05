@@ -238,10 +238,28 @@ class OperatorTest {
                 .as("another account has its own window").isZero();
         assertThat(send(op, submit("15551234567", "5", 0)).commandStatus()).as("unmatched recipient").isZero();
 
-        now.set(now.get().plusSeconds(1));
-        assertThat(send(op, submit("8801511111111", "6", 0)).commandStatus()).as("new second").isZero();
-        assertThat(metrics.snapshot().rejected()).isEqualTo(1);
-        assertThat(metrics.snapshot().submitted()).isEqualTo(6);
+        now.set(now.get().plusMillis(999));
+        assertThat(send(op, submit("8801511111111", "6", 0)).commandStatus()).as("still within the sliding second")
+                .isEqualTo(CommandStatus.ESME_RTHROTTLED.code());
+        now.set(now.get().plusMillis(1));
+        assertThat(send(op, submit("8801511111111", "7", 0)).commandStatus()).as("first submit aged out").isZero();
+        assertThat(metrics.snapshot().rejected()).isEqualTo(2);
+        assertThat(metrics.snapshot().submitted()).isEqualTo(7);
+    }
+
+    @Test
+    void windowOverflowIsRejectedAndRecordedWithoutConsultingRules() {
+        Operator op = operator("rules:\n  - accept: { dlr: DELIVRD }");
+
+        Operator.Outcome over = op.onWindowExceeded("app", "s1", submit("1", "too many", 1), new byte[0], 10);
+
+        assertThat(over.commandStatus()).isEqualTo(CommandStatus.ESME_RMSGQFUL.code());
+        assertThat(over.messageId()).isEmpty();
+        assertThat(over.decision().rule()).isEqualTo("window");
+        Message m = store.get(over.accepted().message().id()).orElseThrow();
+        assertThat(m.status()).isEqualTo(MessageStatus.REJECTED);
+        assertThat(m.segments().getFirst().events().getFirst().detail()).contains("more than 10 submits outstanding");
+        assertThat(timer.tasks).as("no receipt for a submit that was never accepted").isEmpty();
     }
 
     @Test

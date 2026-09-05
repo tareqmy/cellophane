@@ -5,6 +5,20 @@ All notable changes to Cellophane are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The account window size is enforced: a session with more unanswered submits than its window gets
+  `ESME_RMSGQFUL`, and the overflow shows in the inbox as a rejected message.
+- Idle binds are dropped after `CELLOPHANE_IDLE_TIMEOUT` (default two minutes) of silence, like a real operator
+  without keepalives; `enquire_link` keeps a session alive.
+- `status=` filter on `GET /api/v1/messages` (comma-separated, case-insensitive) and a status dropdown in the UI.
+- Logo: header mark, favicon and README image.
+
+### Changed
+
+- `throttle` now uses a sliding one-second window instead of wall-clock seconds, so a burst straddling a second
+  boundary can no longer pass twice the limit.
+
 ## [0.2.0] - 2026-09-05
 
 ### Changed

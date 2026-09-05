@@ -20,6 +20,7 @@ public final class SmppSession {
     private final AtomicLong submitted = new AtomicLong();
     private final AtomicInteger sequence = new AtomicInteger();
     private final Map<Integer, String> awaitingReceiptAck = new ConcurrentHashMap<>();
+    private final AtomicInteger inFlight = new AtomicInteger();
     private volatile Account account;
     private volatile BindType bindType;
     private volatile Instant boundAt;
@@ -85,6 +86,19 @@ public final class SmppSession {
     /** The part whose receipt the ESME just acknowledged, if the sequence number is one we sent. */
     public Optional<String> receiptAcked(int sequenceNumber) {
         return Optional.ofNullable(awaitingReceiptAck.remove(sequenceNumber));
+    }
+
+    /** Submits received on this session whose response has not been written yet. */
+    public int inFlight() {
+        return inFlight.get();
+    }
+
+    void submitStarted() {
+        inFlight.incrementAndGet();
+    }
+
+    void submitAnswered() {
+        inFlight.decrementAndGet();
     }
 
     void countSubmit() {

@@ -27,6 +27,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,9 +50,6 @@ public final class Operator implements Gates {
                           Inbox.Accepted accepted, Decision decision) {
     }
 
-    private record ThrottleWindow(long second, AtomicInteger count) {
-    }
-
     private final RuleEngine rules;
     private final Inbox inbox;
     private final ReceiptSink receipts;
@@ -58,7 +57,7 @@ public final class Operator implements Gates {
     private final Clock clock;
     private final RandomGenerator random;
     private final Metrics metrics;
-    private final Map<String, ThrottleWindow> throttles = new ConcurrentHashMap<>();
+    private final Map<String, Deque<Long>> throttles = new ConcurrentHashMap<>();
     private final Map<String, AtomicInteger> disconnectCounts = new ConcurrentHashMap<>();
 
     public Operator(RuleEngine rules, Inbox inbox, ReceiptSink receipts, DelayedExecutor timer, Clock clock,
@@ -115,6 +114,22 @@ public final class Operator implements Gates {
         return gates.isEmpty() ? "" : " (rules: " + String.join(", ", gates) + ")";
     }
 
+    /**
+     * The ESME sent more concurrent submits than its account's window allows. The submit is answered with
+     * {@code ESME_RMSGQFUL} without consulting the rules, and kept in the inbox so the overflow is visible.
+     */
+    public Outcome onWindowExceeded(String account, String sessionId, SubmitSm submit, byte[] rawPdu, int window) {
+        Inbox.Decoded decoded = Inbox.decode(submit);
+        int status = CommandStatus.ESME_RMSGQFUL.code();
+        Instant now = clock.instant();
+        Inbox.Accepted stored = inbox.receive(account, sessionId, submit, rawPdu, decoded, MessageStatus.REJECTED,
+                new Event(now, EventType.REJECTED, "submit_sm_resp ESME_RMSGQFUL (more than " + window
+                        + " submits outstanding on the session; account window exceeded)"));
+        metrics.submitted(false);
+        return new Outcome(status, "", Duration.ZERO, false, stored,
+                new Decision("window", new Reject(status), Duration.ZERO, false, List.of("window")));
+    }
+
     /** Sends a message on behalf of an HTTP client, through the same rules as an SMPP submit. */
     public Outcome sendHttp(String from, String to, String text) {
         SubmitSm submit = Inbox.httpSubmit(from, to, text);
@@ -128,13 +143,21 @@ public final class Operator implements Gates {
 
     // ----------------------------------------------------------------- gates
 
+    /** Sliding one-second window per rule and account: over the limit when {@code tps} submits landed in the last second. */
     @Override
     public boolean overThrottle(Rule rule, Throttle throttle, RuleContext ctx) {
-        long second = clock.instant().getEpochSecond();
-        String key = rule.name() + "/" + ctx.account();
-        ThrottleWindow window = throttles.compute(key, (k, w) -> w == null || w.second() != second
-                ? new ThrottleWindow(second, new AtomicInteger()) : w);
-        return window.count().incrementAndGet() > throttle.tps();
+        long now = clock.millis();
+        Deque<Long> recent = throttles.computeIfAbsent(rule.name() + "/" + ctx.account(), k -> new ArrayDeque<>());
+        synchronized (recent) {
+            while (!recent.isEmpty() && now - recent.peekFirst() >= 1_000) {
+                recent.pollFirst();
+            }
+            if (recent.size() >= throttle.tps()) {
+                return true;
+            }
+            recent.addLast(now);
+            return false;
+        }
     }
 
     @Override

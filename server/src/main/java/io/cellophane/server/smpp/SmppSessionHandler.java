@@ -29,6 +29,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.timeout.IdleStateEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,12 +126,23 @@ final class SmppSessionHandler extends SimpleChannelInboundHandler<Pdu> {
             ctx.writeAndFlush(submit.respond(ESME_RINVBNDSTS.code(), ""));
             return;
         }
-        byte[] raw = ctx.channel().attr(RawPduCapture.RAW_PDU).get();
-        Operator.Outcome outcome = operator.onSubmit(session.account().orElseThrow().systemId(), session.id(),
-                submit, raw != null ? raw : PduCodec.encode(submit));
+        Account account = session.account().orElseThrow();
+        byte[] captured = ctx.channel().attr(RawPduCapture.RAW_PDU).get();
+        byte[] raw = captured != null ? captured : PduCodec.encode(submit);
         session.countSubmit();
+        if (session.inFlight() >= account.windowSize()) {
+            // The ESME has more submits outstanding than its window allows; an operator says its queue is full.
+            log.warn("[{}] window of {} exceeded, answering ESME_RMSGQFUL", session.id(), account.windowSize());
+            Operator.Outcome over = operator.onWindowExceeded(account.systemId(), session.id(), submit, raw,
+                    account.windowSize());
+            ctx.writeAndFlush(submit.respond(over.commandStatus(), ""));
+            return;
+        }
+        session.submitStarted();
+        Operator.Outcome outcome = operator.onSubmit(account.systemId(), session.id(), submit, raw);
         SubmitSmResp resp = submit.respond(outcome.commandStatus(), outcome.messageId());
         Runnable reply = () -> {
+            session.submitAnswered();
             ChannelFuture written = ctx.writeAndFlush(resp);
             if (outcome.disconnect()) {
                 log.info("[{}] dropping the connection after seq {} as the rules demand", session.id(),
@@ -143,6 +155,17 @@ final class SmppSessionHandler extends SimpleChannelInboundHandler<Pdu> {
         } else {
             ctx.executor().schedule(reply, outcome.latency().toMillis(), TimeUnit.MILLISECONDS);
         }
+    }
+
+    /** Fired by the IdleStateHandler when the ESME has sent nothing (not even enquire_link) for the timeout. */
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            log.info("[{}] no PDU received within the idle timeout; closing the connection", session.id());
+            ctx.close();
+            return;
+        }
+        super.userEventTriggered(ctx, evt);
     }
 
     @Override

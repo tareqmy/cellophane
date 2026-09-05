@@ -74,9 +74,19 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function listMessages(q: string, limit = 200): Promise<MessagesPage> {
+/** Status filter presets offered in the UI, as the API's comma-separated `status` values. */
+export const STATUS_FILTERS: { label: string; statuses: string[] }[] = [
+  { label: 'All statuses', statuses: [] },
+  { label: 'Accepted, no receipt yet', statuses: ['ACCEPTED'] },
+  { label: 'Delivered', statuses: ['DELIVRD'] },
+  { label: 'Failed delivery', statuses: ['UNDELIV', 'EXPIRED', 'REJECTD', 'DELETED', 'UNKNOWN'] },
+  { label: 'Rejected submit', statuses: ['REJECTED'] },
+]
+
+export async function listMessages(q: string, statuses: string[] = [], limit = 200): Promise<MessagesPage> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (q) params.set('q', q)
+  if (statuses.length) params.set('status', statuses.join(','))
   return json(await fetch(`/api/v1/messages?${params}`))
 }
 
@@ -120,7 +130,8 @@ export function statusClass(status: string): string {
   return 'bad'
 }
 
-export function matches(m: MessageSummary, q: string): boolean {
+export function matches(m: MessageSummary, q: string, statuses: string[] = []): boolean {
+  if (statuses.length && !statuses.includes(m.status)) return false
   if (!q) return true
   const needle = q.toLowerCase()
   return [m.from, m.to, m.text ?? ''].some((s) => s.toLowerCase().includes(needle))

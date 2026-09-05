@@ -76,6 +76,7 @@ Load rules from a file at start, or change them at runtime from the UI or the AP
 ```bash
 # in your integration test
 curl "localhost:8025/api/v1/messages?to=8801711111111&text=OTP&since=30s"
+curl "localhost:8025/api/v1/messages?status=UNDELIV,EXPIRED"      # what failed?
 # → {"total":1,"messages":[{"id":"…","from":"MyApp","to":"8801711111111","text":"Your OTP is 482913","parts":1,"dlr":"DELIVRD"}]}
 
 # make operator B fall over for the next test
@@ -110,7 +111,8 @@ Everything has a sensible default. Override with environment variables or a moun
 |---|---|---|
 | `CELLOPHANE_SMPP_PORT` | `2775` | SMPP listen port |
 | `CELLOPHANE_HTTP_PORT` | `8025` | Web UI + API port |
-| `CELLOPHANE_ACCOUNTS` | `cellophane:cellophane` | Comma-separated `system_id:password[:window]` |
+| `CELLOPHANE_ACCOUNTS` | `cellophane:cellophane` | Comma-separated `system_id:password[:window]`; more than `window` unanswered submits on a session get `ESME_RMSGQFUL` (default 10) |
+| `CELLOPHANE_IDLE_TIMEOUT` | `2m` | Drop a bind that sends nothing, not even `enquire_link`, for this long; `0` disables |
 | `CELLOPHANE_RULES` | – | Path to a rules YAML file |
 | `CELLOPHANE_MAX_MESSAGES` | `10000` | In-memory ring buffer size |
 | `CELLOPHANE_DB` | – | *Planned:* SQLite path to persist messages across restarts |

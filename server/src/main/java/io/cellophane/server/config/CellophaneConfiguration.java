@@ -114,6 +114,7 @@ class CellophaneConfiguration {
     @Bean
     SmppServer smppServer(CellophaneProperties properties, AccountRegistry accounts, SessionRegistry sessions,
                           Operator operator, ReceiptDispatcher receipts) {
-        return new SmppServer(properties.smppPort(), properties.systemId(), accounts, sessions, operator, receipts);
+        return new SmppServer(properties.smppPort(), properties.idleTimeout(), properties.systemId(), accounts,
+                sessions, operator, receipts);
     }
 }

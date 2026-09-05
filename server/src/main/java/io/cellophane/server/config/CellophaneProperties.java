@@ -3,6 +3,8 @@ package io.cellophane.server.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
+import java.time.Duration;
+
 /**
  * Settings under the {@code cellophane.*} prefix. Each maps to a {@code CELLOPHANE_*} environment variable
  * through Spring's relaxed binding, e.g. {@code CELLOPHANE_SMPP_PORT}.
@@ -12,6 +14,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param maxMessages in-memory inbox capacity; the oldest message is dropped when full
  * @param systemId    the system_id the fake operator reports in bind responses
  * @param rules       path of a rules YAML file to load at start; empty for the built-in default rules
+ * @param idleTimeout close an SMPP connection that sends nothing (not even enquire_link) for this long; 0 disables
  */
 @ConfigurationProperties("cellophane")
 public record CellophaneProperties(
@@ -19,5 +22,6 @@ public record CellophaneProperties(
         @DefaultValue("cellophane:cellophane") String accounts,
         @DefaultValue("10000") int maxMessages,
         @DefaultValue("cellophane") String systemId,
-        @DefaultValue("") String rules) {
+        @DefaultValue("") String rules,
+        @DefaultValue("2m") Duration idleTimeout) {
 }
