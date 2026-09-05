@@ -1,0 +1,26 @@
+# Two operators behind one SMSC: 88017 is healthy, 88019 is flaky, 88015 throttles,
+# and the "chaos" account gets its link dropped every ten messages.
+rules:
+  - name: operator-a
+    match: { to: "^88017" }
+    accept: { dlr: DELIVRD, after: 2s }
+
+  - name: operator-b-flaky
+    match: { to: "^88019" }
+    accept:
+      dlr: [ { DELIVRD: 80%, after: 3s }, { UNDELIV: 20%, after: 30s } ]
+
+  - name: operator-c-throttling
+    match: { to: "^88015" }
+    throttle: { tps: 5, then: ESME_RTHROTTLED }
+
+  - name: spam-filter
+    match: { text: "(?i)spam" }
+    reject: ESME_RINVDSTADR
+
+  - name: flapping-link
+    match: { account: "chaos" }
+    disconnect: { after: 10 }
+
+  - default:
+      accept: { dlr: DELIVRD, after: 500ms }

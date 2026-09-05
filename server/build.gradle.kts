@@ -50,6 +50,26 @@ springBoot {
     buildInfo()
 }
 
+// Container image via Paketo buildpacks (no Dockerfile). Locally: ./gradlew :server:bootBuildImage
+// The publish workflow passes -PimageRepository=ghcr.io/<owner>/cellophane and the registry credentials.
+val imageRepository = providers.gradleProperty("imageRepository").orElse("cellophane/cellophane").get()
+val isSnapshot = project.version.toString().endsWith("-SNAPSHOT")
+
 tasks.bootBuildImage {
-    imageName = "ghcr.io/cellophane/cellophane:${project.version}"
+    imageName = "$imageRepository:${project.version}"
+    if (!isSnapshot) {
+        tags = listOf("$imageRepository:latest")
+    }
+    environment = mapOf(
+        "BP_JVM_VERSION" to libs.versions.java.get(),
+        // Small heap is plenty: the inbox is bounded and Netty is off-heap.
+        "BPL_JVM_THREAD_COUNT" to "50",
+    )
+    publish = providers.gradleProperty("publishImage").map { it.toBoolean() }.orElse(false).get()
+    docker {
+        publishRegistry {
+            username = providers.environmentVariable("REGISTRY_USERNAME").orElse("").get()
+            password = providers.environmentVariable("REGISTRY_PASSWORD").orElse("").get()
+        }
+    }
 }

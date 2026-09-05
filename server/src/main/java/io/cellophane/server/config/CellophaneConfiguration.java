@@ -24,7 +24,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
-import java.util.random.RandomGenerator;
+import java.util.SplittableRandom;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,7 +101,9 @@ class CellophaneConfiguration {
     @Bean
     Operator operator(RuleEngine rules, Inbox inbox, ReceiptDispatcher receipts, DelayedExecutor timer, Clock clock,
                       Metrics metrics) {
-        return new Operator(rules, inbox, receipts, timer, clock, RandomGenerator.getDefault(), metrics);
+        // SplittableRandom lives in java.base; RandomGenerator.getDefault() needs jdk.random, which the
+        // buildpack's jlinked JRE leaves out, and the app then fails to start inside the container.
+        return new Operator(rules, inbox, receipts, timer, clock, new SplittableRandom(), metrics);
     }
 
     @Bean

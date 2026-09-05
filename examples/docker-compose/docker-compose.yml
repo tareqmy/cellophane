@@ -1,0 +1,11 @@
+services:
+  cellophane:
+    image: ghcr.io/YOU/cellophane
+    ports:
+      - "2775:2775"   # SMPP
+      - "8025:8025"   # web UI + API
+    environment:
+      CELLOPHANE_ACCOUNTS: "app:secret:100,chaos:chaos:10"
+      CELLOPHANE_RULES: /rules.yaml
+    volumes:
+      - ./rules.yaml:/rules.yaml:ro

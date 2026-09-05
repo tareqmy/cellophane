@@ -12,6 +12,7 @@
   } from './lib/api'
   import Detail from './lib/MessageDetail.svelte'
   import RulesPanel from './lib/RulesPanel.svelte'
+  import { applyTheme, loadTheme, nextTheme, type Theme } from './lib/theme'
 
   let messages: MessageSummary[] = $state([])
   let total = $state(0)
@@ -21,6 +22,12 @@
   let selectedId: string | null = $state(null)
   let detail: MessageDetail | null = $state(null)
   let showRules = $state(false)
+  let theme: Theme = $state(loadTheme())
+
+  function cycleTheme() {
+    theme = nextTheme(theme)
+    applyTheme(theme)
+  }
 
   let searchTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -43,6 +50,7 @@
 
   async function select(id: string) {
     selectedId = id
+    if (location.hash !== `#${id}`) history.replaceState(null, '', `#${id}`)
     try {
       detail = await getMessage(id)
     } catch (e) {
@@ -54,6 +62,7 @@
   function close() {
     selectedId = null
     detail = null
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search)
   }
 
   async function clear() {
@@ -75,7 +84,10 @@
   }
 
   onMount(() => {
+    applyTheme(theme)
     load()
+    const fromHash = location.hash.slice(1)
+    if (fromHash) select(fromHash)
     const stream = new EventSource('/api/v1/messages/stream')
     stream.onopen = () => (live = true)
     stream.onerror = () => (live = false)
@@ -110,6 +122,9 @@
   <span class="status" class:live>{live ? 'live' : 'reconnecting'}</span>
   <span class="count">{total} message{total === 1 ? '' : 's'}</span>
   <button onclick={() => (showRules = !showRules)} class:active={showRules}>Rules</button>
+  <button onclick={cycleTheme} title="Theme: {theme} (click to change)" class="theme"
+    >{theme === 'dark' ? '☾' : theme === 'light' ? '☀' : '◐'}</button
+  >
   <button onclick={clear} disabled={total === 0}>Clear inbox</button>
 </header>
 

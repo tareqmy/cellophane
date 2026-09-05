@@ -1,0 +1,11 @@
+{
+  "name": "cellophane-example-node-smpp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node send.mjs"
+  },
+  "dependencies": {
+    "smpp": "0.6.0-rc.4"
+  }
+}

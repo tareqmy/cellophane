@@ -69,7 +69,7 @@ rules:
       accept: { dlr: DELIVRD, after: 500ms }
 ```
 
-Load rules from a file at start, or change them at runtime from the UI or the API — including mid-test from a CI step.
+Load rules from a file at start, or change them at runtime from the UI or the API — including mid-test from a CI step. Every decision shows up in the message's timeline: which rule answered, when the receipt went out, whether the link was dropped. The full reference is in [docs/rules.md](docs/rules.md).
 
 **Is scriptable end to end.** Everything the UI can do, the REST API can do: search and fetch messages, clear the inbox, assert that a message arrived, inject a mobile-originated message toward your receiver bind, swap the rule set, read stats. OpenAPI at `/api`.
 
@@ -79,7 +79,11 @@ curl "localhost:8025/api/v1/messages?to=8801711111111&text=OTP&since=30s"
 # → {"total":1,"messages":[{"id":"…","from":"MyApp","to":"8801711111111","text":"Your OTP is 482913","parts":1,"dlr":"DELIVRD"}]}
 
 # make operator B fall over for the next test
-curl -X PUT localhost:8025/api/v1/rules -d @chaos.yaml
+curl -X PUT localhost:8025/api/v1/rules -H 'content-type: application/yaml' --data-binary @chaos.yaml
+
+# push a mobile-originated message at your receiver bind
+curl -X POST localhost:8025/api/v1/mo -H 'content-type: application/json' \
+  -d '{"from":"8801711111111","to":"MyApp","text":"STOP"}'
 ```
 
 ## Why not SMPPSim?
@@ -109,7 +113,7 @@ Everything has a sensible default. Override with environment variables or a moun
 | `CELLOPHANE_ACCOUNTS` | `cellophane:cellophane` | Comma-separated `system_id:password[:window]` |
 | `CELLOPHANE_RULES` | – | Path to a rules YAML file |
 | `CELLOPHANE_MAX_MESSAGES` | `10000` | In-memory ring buffer size |
-| `CELLOPHANE_DB` | – | SQLite path to persist messages across restarts |
+| `CELLOPHANE_DB` | – | *Planned:* SQLite path to persist messages across restarts |
 
 ```yaml
 # docker-compose.yml
@@ -126,7 +130,7 @@ services:
 
 ## Examples
 
-The [`examples/`](examples/) folder has ready-to-run setups: a Spring Boot client using cloudhopper, a Node client using `node-smpp`, and a docker-compose that puts Cellophane behind [Jasmin](https://github.com/jookies/jasmin) so you can test a full gateway locally.
+The [`examples/`](examples/) folder has ready-to-run setups: a docker-compose with a rules file, a CI-style shell script that sends a message and asserts on the inbox, a Java client using cloudhopper, and a Node client using `node-smpp`. A compose file that puts Cellophane behind [Jasmin](https://github.com/jookies/jasmin) is on the list.
 
 ## Roadmap
 
