@@ -110,6 +110,9 @@
 </script>
 
 <header>
+  <svg class="logo" viewBox="0 0 96 96" aria-hidden="true">
+    <path fill="currentColor" fill-rule="evenodd" d="M48 14 C26 14 10 28 10 46 C10 64 26 78 48 78 L76 78 C82 78 86 74 86 68 L86 46 C86 28 70 14 48 14 Z M29 48 a4 4 0 0 1 8 0 v12 a4 4 0 0 1 -8 0 Z M44 40 a4 4 0 0 1 8 0 v20 a4 4 0 0 1 -8 0 Z M59 32 a4 4 0 0 1 8 0 v28 a4 4 0 0 1 -8 0 Z"/>
+  </svg>
   <h1>Cellophane</h1>
   <span class="tagline">the see-through SMSC</span>
   <input
