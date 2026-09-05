@@ -5,14 +5,16 @@ welcome.
 
 ## Build
 
-You need a JDK (21 is the target; Gradle's toolchain support downloads one if needed) and Docker only for the
-container image. Node is downloaded by the build.
+You need JDK 21 or newer (the code targets 21) and Docker only for the container image. Maven and Node are
+downloaded by the build: `./mvnw` fetches Maven, and the `ui` module fetches Node.
 
 ```bash
-./gradlew build                      # everything, with tests
-./gradlew :server:bootRun            # run on :2775 (SMPP) and :8025 (HTTP)
-./gradlew :server:bootBuildImage     # container image via buildpacks
-cd ui && npm run dev                 # UI with hot reload, proxied to :8025
+./mvnw verify                                  # everything, with tests
+./mvnw -DskipTests package                     # just the jar ...
+java -jar server/target/cellophane-server-*.jar   # ... run on :2775 (SMPP) and :8025 (HTTP)
+./mvnw -Pimage -DskipTests verify              # container image via buildpacks
+./mvnw -Pimage verify                          # image plus the smoke test against it (needs Docker)
+cd ui && npm run dev                           # UI with hot reload, proxied to :8025
 ```
 
 Tests include real-client checks: cloudhopper (an independent SMPP implementation) binds to the running server in

@@ -22,7 +22,7 @@ is plain Java; Spring only wires it together.
 |---|---|---|
 | `smpp` | SMPP 3.4 codec, GSM 03.38, UDH, receipt text, PDU annotator. No Spring. Publishable as a library. | Netty |
 | `server` | Spring Boot app: SMPP listener, inbox, rules, operator, REST/SSE API. Bundles the UI. | `smpp`, Spring Boot |
-| `ui` | Vite + Svelte single page. Built by Gradle and copied into the jar under `static/`. | Node (downloaded by Gradle) |
+| `ui` | Vite + Svelte single page. Built by Maven into a jar of `static/` resources the server serves. | Node (downloaded by Maven) |
 
 ## The codec (`smpp`)
 

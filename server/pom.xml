@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Spring Boot application: hosts the Netty SMPP listener, the REST/SSE API and the bundled web UI. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.cellophane</groupId>
+    <artifactId>cellophane-parent</artifactId>
+    <version>${revision}</version>
+  </parent>
+
+  <artifactId>cellophane-server</artifactId>
+  <name>Cellophane server</name>
+
+  <properties>
+    <springdoc.version>3.1.0</springdoc.version>
+    <!-- Container image, built by the "image" profile: ./mvnw -Pimage -DskipTests verify
+         The publish workflow adds -Dimage.repository=ghcr.io/<owner>/cellophane and -Dimage.publish=true. -->
+    <image.repository>cellophane/cellophane</image.repository>
+    <image.name>${image.repository}:${project.version}</image.name>
+    <image.publish>false</image.publish>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.cellophane</groupId>
+      <artifactId>cellophane-smpp</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The built web UI as static/ resources. -->
+    <dependency>
+      <groupId>io.cellophane</groupId>
+      <artifactId>cellophane-ui</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>${springdoc.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Independent SMPP client for end-to-end tests against the listener. -->
+    <dependency>
+      <groupId>com.fizzed</groupId>
+      <artifactId>ch-smpp</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- For the image smoke test (failsafe, -Pimage). -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <compilerArgs>
+            <arg>-Xlint:all</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <image>
+            <name>${image.name}</name>
+            <tags>
+              <tag>${image.repository}:latest</tag>
+            </tags>
+            <env>
+              <BP_JVM_VERSION>${java.version}</BP_JVM_VERSION>
+              <!-- Small footprint: the inbox is bounded and Netty is off-heap. -->
+              <BPL_JVM_THREAD_COUNT>50</BPL_JVM_THREAD_COUNT>
+            </env>
+            <publish>${image.publish}</publish>
+          </image>
+          <docker>
+            <publishRegistry>
+              <username>${env.REGISTRY_USERNAME}</username>
+              <password>${env.REGISTRY_PASSWORD}</password>
+            </publishRegistry>
+          </docker>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+              <goal>build-info</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!-- ./mvnw -Pimage verify: build the container image and run ImageSmokeIT against it. Needs Docker. -->
+    <profile>
+      <id>image</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>build-image</id>
+                <phase>pre-integration-test</phase>
+                <goals>
+                  <goal>build-image-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-failsafe-plugin</artifactId>
+            <configuration>
+              <!-- The repackaged boot jar is not a plain classpath jar; test against target/classes instead. -->
+              <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+              <systemPropertyVariables>
+                <cellophane.image>${image.name}</cellophane.image>
+              </systemPropertyVariables>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>integration-test</goal>
+                  <goal>verify</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

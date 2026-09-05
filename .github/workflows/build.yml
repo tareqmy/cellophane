@@ -23,20 +23,17 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-
-      - uses: gradle/actions/setup-gradle@v4
+          cache: maven
 
       - name: Build and test
-        run: ./gradlew build --no-daemon
+        run: ./mvnw -B -ntp verify
 
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-${{ matrix.os }}
-          path: |
-            smpp/build/reports/tests/test
-            server/build/reports/tests/test
+          path: '**/target/surefire-reports'
 
   image:
     name: container image smoke test
@@ -48,15 +45,14 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-
-      - uses: gradle/actions/setup-gradle@v4
+          cache: maven
 
       - name: Build the image and run the smoke test against it
-        run: ./gradlew :server:imageTest --no-daemon
+        run: ./mvnw -B -ntp -Pimage verify
 
       - name: Upload image test report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: image-test-report
-          path: server/build/reports/tests/imageTest
+          path: server/target/failsafe-reports

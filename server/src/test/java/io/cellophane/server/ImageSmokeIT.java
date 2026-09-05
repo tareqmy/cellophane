@@ -39,9 +39,10 @@ import org.testcontainers.utility.DockerImageName;
 /**
  * The image a user actually runs: start it the way the README says, bind a real SMPP client to it, send a message,
  * receive the receipt, read it back over HTTP. Catches what unit tests on a full JDK cannot, such as modules
- * missing from the jlinked JRE inside the container.
+ * missing from the jlinked JRE inside the container. Runs only under the {@code image} Maven profile
+ * ({@code ./mvnw -Pimage verify}) because it needs Docker.
  */
-class ImageSmokeTest {
+class ImageSmokeIT {
 
     private static final String IMAGE = System.getProperty("cellophane.image", "cellophane/cellophane:0.2.0-SNAPSHOT");
 

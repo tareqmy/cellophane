@@ -20,8 +20,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-
-      - uses: gradle/actions/setup-gradle@v4
+          cache: maven
 
       - name: Work out version and image name
         id: meta
@@ -31,16 +30,17 @@ jobs:
 
       - name: Test, build the image and smoke-test it
         run: >
-          ./gradlew build :server:imageTest --no-daemon
-          -PreleaseVersion=${{ steps.meta.outputs.version }}
-          -PimageRepository=${{ steps.meta.outputs.image }}
+          ./mvnw -B -ntp -Pimage verify
+          -Drevision=${{ steps.meta.outputs.version }}
+          -Dimage.repository=${{ steps.meta.outputs.image }}
 
-      - name: Build and publish image
+      - name: Publish the image
         env:
           REGISTRY_USERNAME: ${{ github.actor }}
           REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        # Same profile as the smoke test; the image layers are cached from the previous step.
         run: >
-          ./gradlew :server:bootBuildImage --no-daemon
-          -PreleaseVersion=${{ steps.meta.outputs.version }}
-          -PimageRepository=${{ steps.meta.outputs.image }}
-          -PpublishImage=true
+          ./mvnw -B -ntp -Pimage -DskipTests verify
+          -Drevision=${{ steps.meta.outputs.version }}
+          -Dimage.repository=${{ steps.meta.outputs.image }}
+          -Dimage.publish=true

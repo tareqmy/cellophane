@@ -4,8 +4,8 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 export default defineConfig({
   plugins: [svelte()],
   build: {
-    // Inside Gradle's build dir so `./gradlew clean` removes it and :server can consume it.
-    outDir: 'build/dist',
+    // Under Maven's target/ so `./mvnw clean` removes it; the ui module packages it as static/ resources.
+    outDir: 'target/dist',
     emptyOutDir: true,
   },
   server: {
