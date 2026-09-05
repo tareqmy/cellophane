@@ -50,6 +50,35 @@ springBoot {
     buildInfo()
 }
 
+// Runs the real container image and talks to it over SMPP and HTTP. Needs Docker, so it is not part of
+// `build`; run it with ./gradlew :server:imageTest (CI does, before publishing an image).
+testing {
+    suites {
+        register<JvmTestSuite>("imageTest") {
+            useJUnitJupiter(libs.versions.junit.get())
+            dependencies {
+                implementation(project())
+                implementation(platform(org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES))
+                implementation("org.testcontainers:testcontainers")
+                implementation("org.springframework:spring-web")
+                implementation("tools.jackson.core:jackson-databind")
+                implementation("org.awaitility:awaitility")
+                implementation(libs.assertj.core)
+                implementation(libs.cloudhopper.smpp)
+                runtimeOnly(libs.slf4j.simple)
+            }
+            targets.all {
+                testTask.configure {
+                    dependsOn(tasks.bootBuildImage)
+                    systemProperty("cellophane.image", tasks.bootBuildImage.get().imageName.get())
+                    systemProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn")
+                    shouldRunAfter(tasks.test)
+                }
+            }
+        }
+    }
+}
+
 // Container image via Paketo buildpacks (no Dockerfile). Locally: ./gradlew :server:bootBuildImage
 // The publish workflow passes -PimageRepository=ghcr.io/<owner>/cellophane and the registry credentials.
 val imageRepository = providers.gradleProperty("imageRepository").orElse("cellophane/cellophane").get()

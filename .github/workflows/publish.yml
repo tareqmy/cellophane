@@ -29,8 +29,11 @@ jobs:
           echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
-      - name: Test
-        run: ./gradlew build --no-daemon -PreleaseVersion=${{ steps.meta.outputs.version }}
+      - name: Test, build the image and smoke-test it
+        run: >
+          ./gradlew build :server:imageTest --no-daemon
+          -PreleaseVersion=${{ steps.meta.outputs.version }}
+          -PimageRepository=${{ steps.meta.outputs.image }}
 
       - name: Build and publish image
         env:
