@@ -43,7 +43,7 @@ import org.testcontainers.utility.DockerImageName;
  */
 class ImageSmokeTest {
 
-    private static final String IMAGE = System.getProperty("cellophane.image", "cellophane/cellophane:0.1.0-SNAPSHOT");
+    private static final String IMAGE = System.getProperty("cellophane.image", "cellophane/cellophane:0.2.0-SNAPSHOT");
 
     private static GenericContainer<?> cellophane;
     private static RestClient http;
