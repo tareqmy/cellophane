@@ -5,7 +5,7 @@ catches everything in a live web inbox, and misbehaves on command.
 docker run -p 2775:2775 -p 8025:8025 ghcr.io/tareqmy/cellophane
 ```
 
-**In this first release**
+**In this release** (0.2.0 is the first published build; 0.1.0 was tagged before the build moved to Maven)
 
 - SMPP 3.4 binds (TX, RX, TRX), `submit_sm` with UDH and SAR concatenation, GSM 7-bit, Latin-1 and UCS-2, delivery
   receipts as standard `deliver_sm` DLRs, multiple ESME accounts.

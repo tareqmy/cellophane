@@ -21,19 +21,21 @@ one most likely to surprise.
 
 ## 2. Cut the release
 
-A `v0.1.0` tag is already on GitHub, but it points at the pre-Maven commit and, because it arrived in the
-repository's first push, it never triggered a workflow. The local tag has been moved to the launch-ready
-commit; push it over the old one:
+Two tags are on GitHub: `v0.1.0` (the pre-Maven commit) and `v0.2.0` (the Maven build). Neither triggered the
+**publish** workflow: GitHub ignores workflows for tags that arrive with a repository's first pushes, before it
+has registered them. `0.2.0` is the release to ship. Re-push its tag to trigger publishing, moving it to the
+launch-ready commit first so the release includes the launch notes and issue forms:
 
 ```bash
-git push --force origin v0.1.0
+git tag -f v0.2.0 master
+git push --force origin v0.2.0
 ```
 
-Pushing a tag runs the **publish** workflow: tests, container image, smoke test against the image, then a push to
-`ghcr.io/tareqmy/cellophane:0.1.0` and `:latest`. Afterwards:
+The workflow runs tests, builds the image, smoke-tests it, then pushes `ghcr.io/tareqmy/cellophane:0.2.0`
+and `:latest`. Watch it with `gh run watch`. Afterwards:
 
 ```bash
-gh release create v0.1.0 --title "Cellophane 0.1.0" --notes-file docs/launch/release-notes.md
+gh release create v0.2.0 --title "Cellophane 0.2.0" --notes-file docs/launch/release-notes.md
 ```
 
 Then make the package public: GitHub → your profile → Packages → cellophane → Package settings → Change

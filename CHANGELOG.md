@@ -5,6 +5,18 @@ All notable changes to Cellophane are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-05
+
+### Changed
+
+- The build moved from Gradle to Maven (`./mvnw verify`). Same modules and artifacts; the container image is
+  built by the `image` profile and the image smoke test is a failsafe integration test. Nothing changes for
+  users of the image.
+
+### Added
+
+- Issue forms for bug reports and operator quirks, and launch notes under `docs/launch`.
+
 ## [0.1.0] - 2026-09-05
 
 First release: a fake mobile operator with a real inbox.
@@ -30,5 +42,6 @@ First release: a fake mobile operator with a real inbox.
 - Container image built with Paketo buildpacks (`ghcr.io/<owner>/cellophane`), GitHub Actions for build and
   publish, examples for docker-compose, CI assertions, node-smpp and cloudhopper.
 
-[Unreleased]: https://github.com/tareqmy/cellophane/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tareqmy/cellophane/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/tareqmy/cellophane/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tareqmy/cellophane/releases/tag/v0.1.0
