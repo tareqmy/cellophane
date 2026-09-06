@@ -44,7 +44,7 @@ import org.testcontainers.utility.DockerImageName;
  */
 class ImageSmokeIT {
 
-    private static final String IMAGE = System.getProperty("cellophane.image", "cellophane/cellophane:0.3.0-SNAPSHOT");
+    private static final String IMAGE = System.getProperty("cellophane.image", "cellophane/cellophane:0.4.0-SNAPSHOT");
 
     private static GenericContainer<?> cellophane;
     private static RestClient http;
