@@ -14,7 +14,7 @@
   <name>Cellophane server</name>
 
   <properties>
-    <springdoc.version>3.1.0</springdoc.version>
+    <springdoc.version>3.1.1</springdoc.version>
     <!-- Container image, built by the "image" profile: ./mvnw -Pimage -DskipTests verify
          The publish workflow adds -Dimage.repository=ghcr.io/<owner>/cellophane and -Dimage.publish=true. -->
     <image.repository>cellophane/cellophane</image.repository>
