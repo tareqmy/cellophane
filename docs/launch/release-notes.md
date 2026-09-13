@@ -5,7 +5,7 @@ catches everything in a live web inbox, and misbehaves on command.
 docker run -p 2775:2775 -p 8025:8025 ghcr.io/tareqmy/cellophane
 ```
 
-**In this release** (0.3.0 is the first published build; 0.1.0 and 0.2.0 were tagged before the launch was ready)
+**In this release** (0.4.0 is the first published build; earlier tags predate the launch)
 
 - SMPP 3.4 binds (TX, RX, TRX), `submit_sm` with UDH and SAR concatenation, GSM 7-bit, Latin-1 and UCS-2, delivery
   receipts as standard `deliver_sm` DLRs, multiple ESME accounts.
@@ -19,5 +19,10 @@ docker run -p 2775:2775 -p 8025:8025 ghcr.io/tareqmy/cellophane
 - `POST /api/v1/send` so non-SMPP apps and curl demos share the inbox.
 - Operator realism outside the rules: per-account windows answered with `ESME_RMSGQFUL`, idle binds dropped
   after `CELLOPHANE_IDLE_TIMEOUT`, and a `status=` filter to find what failed.
+- `CELLOPHANE_DB` keeps the inbox in a SQLite file so it survives restarts.
+- A Sessions panel: who is bound, how full each window is, live counters, and a form to inject
+  mobile-originated messages.
+- Examples: docker-compose with rules, a CI assertion script, cloudhopper and node-smpp clients, and Cellophane
+  as the operator behind a Jasmin gateway.
 
 See the [README](https://github.com/tareqmy/cellophane#readme) and [docs/rules.md](https://github.com/tareqmy/cellophane/blob/master/docs/rules.md).

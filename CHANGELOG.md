@@ -5,6 +5,8 @@ All notable changes to Cellophane are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-13
+
 ### Added
 
 - `CELLOPHANE_DB=/path/inbox.db` keeps the inbox in a SQLite file so messages, parts, timelines and statuses
@@ -70,7 +72,8 @@ First release: a fake mobile operator with a real inbox.
 - Container image built with Paketo buildpacks (`ghcr.io/<owner>/cellophane`), GitHub Actions for build and
   publish, examples for docker-compose, CI assertions, node-smpp and cloudhopper.
 
-[Unreleased]: https://github.com/tareqmy/cellophane/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tareqmy/cellophane/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/tareqmy/cellophane/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tareqmy/cellophane/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tareqmy/cellophane/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tareqmy/cellophane/releases/tag/v0.1.0
