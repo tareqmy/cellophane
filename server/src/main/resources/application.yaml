@@ -16,6 +16,8 @@ cellophane:
   accounts: ${CELLOPHANE_ACCOUNTS:cellophane:cellophane}
   max-messages: ${CELLOPHANE_MAX_MESSAGES:10000}
   rules: ${CELLOPHANE_RULES:}
+  idle-timeout: ${CELLOPHANE_IDLE_TIMEOUT:2m}
+  db: ${CELLOPHANE_DB:}
 
 springdoc:
   api-docs:

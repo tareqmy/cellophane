@@ -115,7 +115,7 @@ Everything has a sensible default. Override with environment variables or a moun
 | `CELLOPHANE_IDLE_TIMEOUT` | `2m` | Drop a bind that sends nothing, not even `enquire_link`, for this long; `0` disables |
 | `CELLOPHANE_RULES` | – | Path to a rules YAML file |
 | `CELLOPHANE_MAX_MESSAGES` | `10000` | In-memory ring buffer size |
-| `CELLOPHANE_DB` | – | *Planned:* SQLite path to persist messages across restarts |
+| `CELLOPHANE_DB` | – | SQLite file to keep the inbox in across restarts; unset keeps it in memory only. In the container use a path under `/home/cnb`, the one directory the non-root image user owns, and mount a volume there |
 
 ```yaml
 # docker-compose.yml
@@ -126,8 +126,12 @@ services:
     environment:
       CELLOPHANE_ACCOUNTS: "app:secret:100,chaos:chaos:10"
       CELLOPHANE_RULES: /rules.yaml
+      CELLOPHANE_DB: /home/cnb/cellophane.db   # optional: keep the inbox across restarts
     volumes:
       - ./rules.yaml:/rules.yaml:ro
+      - cellophane-data:/home/cnb
+volumes:
+  cellophane-data:
 ```
 
 ## Examples

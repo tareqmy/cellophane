@@ -60,6 +60,11 @@
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
     </dependency>
+    <!-- Optional inbox persistence (CELLOPHANE_DB); plain JDBC, no pool. -->
+    <dependency>
+      <groupId>org.xerial</groupId>
+      <artifactId>sqlite-jdbc</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>

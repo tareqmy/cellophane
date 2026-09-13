@@ -15,6 +15,7 @@ import java.time.Duration;
  * @param systemId    the system_id the fake operator reports in bind responses
  * @param rules       path of a rules YAML file to load at start; empty for the built-in default rules
  * @param idleTimeout close an SMPP connection that sends nothing (not even enquire_link) for this long; 0 disables
+ * @param db          path of a SQLite file to keep the inbox in across restarts; empty keeps it in memory only
  */
 @ConfigurationProperties("cellophane")
 public record CellophaneProperties(
@@ -23,5 +24,6 @@ public record CellophaneProperties(
         @DefaultValue("10000") int maxMessages,
         @DefaultValue("cellophane") String systemId,
         @DefaultValue("") String rules,
-        @DefaultValue("2m") Duration idleTimeout) {
+        @DefaultValue("2m") Duration idleTimeout,
+        @DefaultValue("") String db) {
 }

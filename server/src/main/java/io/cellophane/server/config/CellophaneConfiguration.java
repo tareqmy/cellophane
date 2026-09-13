@@ -4,6 +4,8 @@ import io.cellophane.server.account.Account;
 import io.cellophane.server.account.AccountRegistry;
 import io.cellophane.server.api.MessageEvents;
 import io.cellophane.server.message.Inbox;
+import io.cellophane.server.message.MessageDatabase;
+import io.cellophane.server.message.MessageListener;
 import io.cellophane.server.message.MessageStore;
 import io.cellophane.server.operator.DelayedExecutor;
 import io.cellophane.server.operator.Metrics;
@@ -16,6 +18,8 @@ import io.cellophane.server.rules.RuleSet;
 import io.cellophane.server.rules.RulesException;
 import io.cellophane.server.smpp.SessionRegistry;
 import io.cellophane.server.smpp.SmppServer;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -55,9 +59,21 @@ class CellophaneConfiguration {
         return new MessageEvents();
     }
 
+    /** Only when CELLOPHANE_DB names a file: opened before the inbox exists, so the store is refilled first. */
     @Bean
-    Inbox inbox(MessageStore store, MessageEvents events, Clock clock) {
-        return new Inbox(store, events, clock);
+    @ConditionalOnExpression("!'${cellophane.db:}'.isBlank()")
+    MessageDatabase messageDatabase(CellophaneProperties properties, MessageStore store) {
+        Path path = Path.of(properties.db());
+        MessageDatabase database = new MessageDatabase(path, properties.maxMessages());
+        database.restore(store);
+        return database;
+    }
+
+    @Bean
+    Inbox inbox(MessageStore store, MessageEvents events, ObjectProvider<MessageDatabase> database, Clock clock) {
+        MessageDatabase db = database.getIfAvailable();
+        MessageListener listener = db == null ? events : MessageListener.all(events, db);
+        return new Inbox(store, listener, clock);
     }
 
     @Bean

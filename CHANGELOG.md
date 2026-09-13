@@ -5,6 +5,12 @@ All notable changes to Cellophane are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `CELLOPHANE_DB=/path/inbox.db` keeps the inbox in a SQLite file so messages, parts, timelines and statuses
+  survive a restart. The file is trimmed to `CELLOPHANE_MAX_MESSAGES` like the in-memory store, and `DELETE
+  /api/v1/messages` empties it too.
+
 ## [0.3.0] - 2026-09-06
 
 ### Added

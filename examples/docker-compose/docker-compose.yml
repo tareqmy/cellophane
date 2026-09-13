@@ -7,5 +7,12 @@ services:
     environment:
       CELLOPHANE_ACCOUNTS: "app:secret:100,chaos:chaos:10"
       CELLOPHANE_RULES: /rules.yaml
+      # The inbox survives `docker compose restart`. /home/cnb is the directory the image's non-root user
+      # owns, so a volume mounted there is writable; a volume at a new path such as /data would be root-owned.
+      CELLOPHANE_DB: /home/cnb/cellophane.db
     volumes:
       - ./rules.yaml:/rules.yaml:ro
+      - cellophane-data:/home/cnb
+
+volumes:
+  cellophane-data:

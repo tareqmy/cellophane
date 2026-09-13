@@ -72,6 +72,14 @@ order. Each segment keeps its PDU, raw bytes, the message_id given to the ESME, 
 `MessageStore` is a bounded insertion-ordered map with an index from any part's message_id to its message. The
 `MessageListener` hook feeds the SSE stream; the REST API is a thin view over the store.
 
+With `CELLOPHANE_DB` set, `MessageDatabase` is a second listener: it journals every new or changed message into a
+SQLite file (`db/schema.sql`: one table each for messages, parts and timeline events, raw PDU bytes included) on
+one background thread, and at start-up refills the store from the file, newest `CELLOPHANE_MAX_MESSAGES` first.
+The store stays the source of truth and the file is trimmed to the same capacity, so a restart looks like nothing
+happened. Two things are deliberately not persisted: receipts still scheduled at shutdown are not re-sent, and a
+concatenated message with parts still missing at shutdown does not pick up the rest after the restart. Plain JDBC
+through `sqlite-jdbc`, no pool and no ORM.
+
 ## Threads
 
 Netty event loops own the SMPP sockets; a handler never blocks. The `Inbox` is synchronised (it is a single
