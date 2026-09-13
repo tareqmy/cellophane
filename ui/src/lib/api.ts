@@ -69,6 +69,44 @@ export type MessageDetail = {
 
 export type MessagesPage = { total: number; messages: MessageSummary[] }
 
+export type BindType = 'TRANSMITTER' | 'RECEIVER' | 'TRANSCEIVER'
+export type SessionInfo = {
+  id: string
+  remoteAddress: string
+  account: string | null
+  bindType: BindType | null
+  connectedAt: string
+  boundAt: string | null
+  submitted: number
+  inFlight: number
+  window: number | null
+}
+export type Stats = {
+  smppPort: number
+  messages: number
+  capacity: number
+  byStatus: Record<string, number>
+  sessions: number
+  boundSessions: number
+  streamSubscribers: number
+  accounts: string[]
+  totals: {
+    submitted: number
+    accepted: number
+    rejected: number
+    receiptsSent: number
+    moSent: number
+    tps: number
+  }
+}
+export type MoSent = {
+  account: string
+  sessionId: string
+  parts: number
+  sequenceNumbers: number[]
+  dataCoding: number
+}
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.json() as Promise<T>
@@ -99,6 +137,36 @@ export async function clearMessages(): Promise<void> {
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
 }
 
+export async function listSessions(): Promise<SessionInfo[]> {
+  return json(await fetch('/api/v1/sessions'))
+}
+
+export async function getStats(): Promise<Stats> {
+  return json(await fetch('/api/v1/stats'))
+}
+
+/** Injects a mobile-originated message toward a bound receiver of the account (any account when empty). */
+export async function sendMo(mo: { account: string; from: string; to: string; text: string }): Promise<MoSent> {
+  const res = await fetch('/api/v1/mo', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(mo),
+  })
+  if (!res.ok) throw new Error(await problemDetail(res))
+  return res.json()
+}
+
+async function problemDetail(res: Response): Promise<string> {
+  let detail = `${res.status} ${res.statusText}`
+  try {
+    const body = await res.json()
+    if (body.detail) detail = body.detail
+  } catch {
+    /* not json */
+  }
+  return detail
+}
+
 export async function getRules(): Promise<string> {
   const res = await fetch('/api/v1/rules')
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
@@ -111,16 +179,7 @@ export async function putRules(yaml: string): Promise<{ rules: number }> {
     headers: { 'content-type': 'application/yaml' },
     body: yaml,
   })
-  if (!res.ok) {
-    let detail = `${res.status} ${res.statusText}`
-    try {
-      const body = await res.json()
-      if (body.detail) detail = body.detail
-    } catch {
-      /* not json */
-    }
-    throw new Error(detail)
-  }
+  if (!res.ok) throw new Error(await problemDetail(res))
   return res.json()
 }
 
@@ -139,6 +198,15 @@ export function matches(m: MessageSummary, q: string, statuses: string[] = []): 
 
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour12: false })
+}
+
+/** "12s", "3m 04s", "1h 02m": how long ago an instant was. */
+export function since(iso: string, now = Date.now()): string {
+  const s = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000))
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ${String(s % 60).padStart(2, '0')}s`
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
 }
 
 export function formatDateTime(iso: string): string {

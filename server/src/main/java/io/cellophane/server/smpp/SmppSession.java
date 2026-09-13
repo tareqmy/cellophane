@@ -106,12 +106,18 @@ public final class SmppSession {
     }
 
     public Info info() {
-        return new Info(id, remoteAddress(), account == null ? null : account.systemId(), bindType, connectedAt,
-                boundAt, submitted.get());
+        Account a = account;
+        return new Info(id, remoteAddress(), a == null ? null : a.systemId(), bindType, connectedAt, boundAt,
+                submitted.get(), inFlight.get(), a == null ? null : a.windowSize());
     }
 
-    /** Immutable snapshot for the API. */
+    /**
+     * Immutable snapshot for the API.
+     *
+     * @param inFlight submits whose response has not been written yet
+     * @param window   the account's window size, or null before the session has bound
+     */
     public record Info(String id, String remoteAddress, String account, BindType bindType, Instant connectedAt,
-                       Instant boundAt, long submitted) {
+                       Instant boundAt, long submitted, int inFlight, Integer window) {
     }
 }

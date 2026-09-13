@@ -10,6 +10,10 @@ All notable changes to Cellophane are recorded here. The format follows
 - `CELLOPHANE_DB=/path/inbox.db` keeps the inbox in a SQLite file so messages, parts, timelines and statuses
   survive a restart. The file is trimmed to `CELLOPHANE_MAX_MESSAGES` like the in-memory store, and `DELETE
   /api/v1/messages` empties it too.
+- A **Sessions** panel in the UI: bound sessions with account, bind type, in-flight submits against the window,
+  and counters (inbox, submits, rate, receipts, MO), refreshed every two seconds, plus a form that injects a
+  mobile-originated `deliver_sm` toward a receiver bind.
+- `GET /api/v1/sessions` reports `inFlight` and `window` per session.
 
 ## [0.3.0] - 2026-09-06
 

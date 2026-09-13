@@ -13,6 +13,7 @@
   } from './lib/api'
   import Detail from './lib/MessageDetail.svelte'
   import RulesPanel from './lib/RulesPanel.svelte'
+  import StatusPanel from './lib/StatusPanel.svelte'
   import { applyTheme, loadTheme, nextTheme, type Theme } from './lib/theme'
 
   let messages: MessageSummary[] = $state([])
@@ -24,6 +25,7 @@
   let selectedId: string | null = $state(null)
   let detail: MessageDetail | null = $state(null)
   let showRules = $state(false)
+  let showStatus = $state(false)
   let theme: Theme = $state(loadTheme())
 
   function cycleTheme() {
@@ -146,13 +148,29 @@
   <span class="spacer"></span>
   <span class="status" class:live>{live ? 'live' : 'reconnecting'}</span>
   <span class="count">{total} message{total === 1 ? '' : 's'}</span>
-  <button onclick={() => (showRules = !showRules)} class:active={showRules}>Rules</button>
+  <button
+    onclick={() => {
+      showStatus = !showStatus
+      if (showStatus) showRules = false
+    }}
+    class:active={showStatus}>Sessions</button
+  >
+  <button
+    onclick={() => {
+      showRules = !showRules
+      if (showRules) showStatus = false
+    }}
+    class:active={showRules}>Rules</button
+  >
   <button onclick={cycleTheme} title="Theme: {theme} (click to change)" class="theme"
     >{theme === 'dark' ? '☾' : theme === 'light' ? '☀' : '◐'}</button
   >
   <button onclick={clear} disabled={total === 0}>Clear inbox</button>
 </header>
 
+{#if showStatus}
+  <StatusPanel onclose={() => (showStatus = false)} />
+{/if}
 {#if showRules}
   <RulesPanel onclose={() => (showRules = false)} />
 {/if}

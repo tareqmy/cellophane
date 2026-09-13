@@ -15,7 +15,7 @@
 
 ---
 
-Point your app's SMPP (or HTTP) client at **Cellophane** instead of a real operator. Every message lands in a live web inbox where you can search it, read the decoded text, inspect the raw PDU, and watch its delivery receipts arrive. Then tell the fake operator to misbehave — throttle, reject, delay, drop the connection — and see how your code copes.
+Point your app's SMPP (or HTTP) client at **Cellophane** instead of a real operator. Every message lands in a live web inbox where you can search it, read the decoded text, inspect the raw PDU, and watch its delivery receipts arrive. Then tell the fake operator to misbehave — throttle, reject, delay, drop the connection — and see how your code copes. The **Sessions** panel shows who is bound, how full each window is, live counters, and lets you inject a mobile-originated message toward a receiver bind.
 
 No SIM cards, no per-message cost, no "please don't run the load test against the vendor sandbox again".
 
