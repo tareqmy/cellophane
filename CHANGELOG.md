@@ -14,6 +14,8 @@ All notable changes to Cellophane are recorded here. The format follows
   and counters (inbox, submits, rate, receipts, MO), refreshed every two seconds, plus a form that injects a
   mobile-originated `deliver_sm` toward a receiver bind.
 - `GET /api/v1/sessions` reports `inFlight` and `window` per session.
+- `examples/jasmin`: a compose file that runs Cellophane as the upstream operator behind a Jasmin gateway,
+  with the connector, user and route configured automatically through jCli.
 
 ## [0.3.0] - 2026-09-06
 

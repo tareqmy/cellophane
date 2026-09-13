@@ -136,7 +136,7 @@ volumes:
 
 ## Examples
 
-The [`examples/`](examples/) folder has ready-to-run setups: a docker-compose with a rules file, a CI-style shell script that sends a message and asserts on the inbox, a Java client using cloudhopper, and a Node client using `node-smpp`. A compose file that puts Cellophane behind [Jasmin](https://github.com/jookies/jasmin) is on the list.
+The [`examples/`](examples/) folder has ready-to-run setups: a docker-compose with a rules file, a CI-style shell script that sends a message and asserts on the inbox, a Java client using cloudhopper, a Node client using `node-smpp`, and a compose file that puts Cellophane behind a [Jasmin](https://github.com/jookies/jasmin) gateway.
 
 ## Roadmap
 
