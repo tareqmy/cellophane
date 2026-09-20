@@ -36,8 +36,16 @@ jobs:
           path: '**/target/surefire-reports'
 
   image:
-    name: container image smoke test
-    runs-on: ubuntu-latest
+    name: container image smoke test (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
 
@@ -47,12 +55,12 @@ jobs:
           java-version: 21
           cache: maven
 
-      - name: Build the image and run the smoke test against it
-        run: ./mvnw -B -ntp -Pimage verify
+      - name: Build the ${{ matrix.arch }} image and run the smoke test against it
+        run: ./mvnw -B -ntp -Pimage verify -Dspring-boot.build-image.imagePlatform=linux/${{ matrix.arch }}
 
       - name: Upload image test report
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: image-test-report
+          name: image-test-report-${{ matrix.arch }}
           path: server/target/failsafe-reports

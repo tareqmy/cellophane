@@ -16,7 +16,10 @@
   <properties>
     <springdoc.version>3.1.1</springdoc.version>
     <!-- Container image, built by the "image" profile: ./mvnw -Pimage -DskipTests verify
-         The publish workflow adds -Dimage.repository=ghcr.io/<owner>/cellophane and -Dimage.publish=true. -->
+         Buildpacks build one architecture per run; -Dspring-boot.build-image.imagePlatform=linux/arm64 picks it.
+         The publish workflow adds -Dimage.repository=ghcr.io/<owner>/cellophane, builds each architecture on
+         its own runner and pushes with docker, then joins them into one manifest. -Dimage.publish=true pushes
+         straight from Maven instead, for a single-architecture image. -->
     <image.repository>cellophane/cellophane</image.repository>
     <image.name>${image.repository}:${project.version}</image.name>
     <image.publish>false</image.publish>

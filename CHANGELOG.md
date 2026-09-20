@@ -5,6 +5,12 @@ All notable changes to Cellophane are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The container image is published for both `linux/amd64` and `linux/arm64` under one tag, so Apple Silicon and
+  Graviton hosts run it natively instead of under emulation. Each architecture is built and smoke-tested on its
+  own runner; `1.2.3-amd64` and `1.2.3-arm64` tags carry the single-architecture images.
+
 ## [0.4.0] - 2026-09-13
 
 ### Added
