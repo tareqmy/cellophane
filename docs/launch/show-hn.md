@@ -23,8 +23,9 @@ messages. Rules can be swapped mid-test from a CI step, and there's a REST API t
 
 Technical notes for the curious: it's Java 21 / Spring Boot with its own SMPP 3.4 codec on Netty (the existing
 Java SMPP libraries are Netty 3 era or blocking), about 140 tests including conformance checks against
-cloudhopper as an independent client, and a Testcontainers test that runs the real image. That last one caught a
-bug the unit tests couldn't: the buildpack's minimal JRE lacks the `jdk.random` module.
+cloudhopper as an independent client, and a Testcontainers test that runs the real image on both amd64 and arm64
+(the image is multi-arch). That last one caught a bug the unit tests couldn't: the buildpack's minimal JRE lacks
+the `jdk.random` module.
 
 Things it doesn't do yet: SMPP 5.0, TLS, `data_sm`. Those are next if people want them.
 

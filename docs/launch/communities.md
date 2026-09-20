@@ -15,8 +15,10 @@ sends standard DLRs (DELIVRD/UNDELIV etc. with configurable delays and probabili
 by destination prefix, and can drop the bind after N messages, which is handy for testing Jasmin's reconnect
 and retry behaviour. There's a REST API to assert on what arrived and to push MO messages back toward Jasmin.
 
-A compose file with Jasmin wired to it is something I'd like to add to the examples; if anyone has a minimal
-jcli script for a connector, I'd gladly take a PR or a pointer.
+There's a compose file in the repo that runs Jasmin with Cellophane as its upstream operator and configures the
+connector, user and route through jCli automatically:
+https://github.com/tareqmy/cellophane/tree/master/examples/jasmin. If your setup differs, I'd gladly take a PR
+or a pointer.
 
 ## Kannel users list
 

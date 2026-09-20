@@ -30,10 +30,14 @@ the connection.
 | `CELLOPHANE_RULES` | – | Path to a mounted rules YAML file |
 | `CELLOPHANE_MAX_MESSAGES` | `10000` | In-memory inbox size |
 | `CELLOPHANE_IDLE_TIMEOUT` | `2m` | Drop binds that stay silent this long; `0` disables |
+| `CELLOPHANE_DB` | – | SQLite file to keep the inbox across restarts; mount a volume under `/home/cnb` for it |
 
 ## Tags
 
 - `latest`: the most recent release
 - `x.y.z`: a specific release
+
+Every tag is a multi-arch image for `linux/amd64` and `linux/arm64`, so it runs natively on Apple Silicon and
+Graviton.
 
 Source, documentation and issues: https://github.com/tareqmy/cellophane (MIT licence).
