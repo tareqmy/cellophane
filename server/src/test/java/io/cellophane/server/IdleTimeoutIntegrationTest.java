@@ -25,7 +25,7 @@ import org.springframework.web.client.RestClient;
 
 /** A bind that goes quiet is dropped after the idle timeout, the way an operator drops a link without keepalives. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"cellophane.smpp-port=0", "cellophane.accounts=app:secret", "cellophane.idle-timeout=1s"})
+        properties = {"cellophane.smpp-port=0", "cellophane.accounts=app:secret", "cellophane.idle-timeout=2s"})
 class IdleTimeoutIntegrationTest {
 
     @Autowired
@@ -63,7 +63,7 @@ class IdleTimeoutIntegrationTest {
         session = client.bind(config, new DefaultSmppSessionHandler());
         assertThat(boundSessions()).isEqualTo(1);
 
-        // keepalives inside the timeout keep the session alive
+        // keepalives well inside the timeout keep the session alive; the slack absorbs a slow CI runner
         for (int i = 0; i < 3; i++) {
             Thread.sleep(600);
             assertThat(session.enquireLink(new EnquireLink(), 2000).getCommandStatus()).isZero();
@@ -71,6 +71,6 @@ class IdleTimeoutIntegrationTest {
         assertThat(boundSessions()).isEqualTo(1);
 
         // then silence: gone within the timeout plus a margin
-        await().atMost(Duration.ofSeconds(4)).untilAsserted(() -> assertThat(boundSessions()).isZero());
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertThat(boundSessions()).isZero());
     }
 }

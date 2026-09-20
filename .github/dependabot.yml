@@ -8,6 +8,16 @@ updates:
     directory: /ui
     schedule:
       interval: weekly
+    groups:
+      # The Svelte plugin pins a Vite major, so the two can only move together.
+      vite:
+        patterns:
+          - vite
+          - "@sveltejs/vite-plugin-svelte"
+    ignore:
+      # svelte-check 4.x accepts TypeScript 5 and 6 only. Drop this once it supports 7.
+      - dependency-name: typescript
+        versions: [">=7"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
