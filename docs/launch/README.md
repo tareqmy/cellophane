@@ -21,14 +21,15 @@ one most likely to surprise.
 
 ## 2. Cut the release
 
-`v0.4.0` is the release: it was tagged on the launch-ready commit and pushed, which runs the **publish**
-workflow. (`v0.1.0` to `v0.3.0` exist on GitHub but predate the launch; their images were never made public.)
+`v0.4.1` is the release: tag the launch-ready commit and push the tag, which runs the **publish** workflow.
+(`v0.1.0` to `v0.3.0` exist on GitHub but predate the launch; `v0.4.0` is the same software published for
+amd64 only, before the image went multi-arch.)
 
-The workflow runs tests, builds the image, smoke-tests it, then pushes `ghcr.io/tareqmy/cellophane:0.4.0`
-and `:latest`. Watch it with `gh run watch`. Afterwards:
+The workflow runs tests, builds and smoke-tests the image on an amd64 and an arm64 runner, then joins the two
+into `ghcr.io/tareqmy/cellophane:0.4.1` and `:latest`. Watch it with `gh run watch`. Afterwards:
 
 ```bash
-gh release create v0.4.0 --title "Cellophane 0.4.0" --notes-file docs/launch/release-notes.md
+gh release create v0.4.1 --title "Cellophane 0.4.1" --notes-file docs/launch/release-notes.md
 ```
 
 Then make the package public: GitHub → your profile → Packages → cellophane → Package settings → Change

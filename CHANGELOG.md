@@ -5,11 +5,14 @@ All notable changes to Cellophane are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-20
+
 ### Changed
 
 - The container image is published for both `linux/amd64` and `linux/arm64` under one tag, so Apple Silicon and
   Graviton hosts run it natively instead of under emulation. Each architecture is built and smoke-tested on its
-  own runner; `1.2.3-amd64` and `1.2.3-arm64` tags carry the single-architecture images.
+  own runner; `0.4.1-amd64` and `0.4.1-arm64` tags carry the single-architecture images.
+- Netty 4.2.18 and springdoc 3.1.1.
 
 ## [0.4.0] - 2026-09-13
 
@@ -78,7 +81,8 @@ First release: a fake mobile operator with a real inbox.
 - Container image built with Paketo buildpacks (`ghcr.io/<owner>/cellophane`), GitHub Actions for build and
   publish, examples for docker-compose, CI assertions, node-smpp and cloudhopper.
 
-[Unreleased]: https://github.com/tareqmy/cellophane/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/tareqmy/cellophane/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/tareqmy/cellophane/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/tareqmy/cellophane/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tareqmy/cellophane/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tareqmy/cellophane/compare/v0.1.0...v0.2.0
