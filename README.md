@@ -29,6 +29,8 @@ No SIM cards, no per-message cost, no "please don't run the load test against th
 docker run -p 2775:2775 -p 8025:8025 ghcr.io/tareqmy/cellophane
 ```
 
+The image is built for `linux/amd64` and `linux/arm64`, so it runs natively on Apple Silicon and Graviton.
+
 Open **http://localhost:8025**. Bind your SMPP client to `localhost:2775` with system_id `cellophane` and password `cellophane`, or just:
 
 ```bash
