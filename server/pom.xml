@@ -14,7 +14,7 @@
   <name>Cellophane server</name>
 
   <properties>
-    <springdoc.version>3.1.1</springdoc.version>
+    <springdoc.version>3.2.0</springdoc.version>
     <!-- Container image, built by the "image" profile: ./mvnw -Pimage -DskipTests verify
          Buildpacks build one architecture per run; -Dspring-boot.build-image.imagePlatform=linux/arm64 picks it.
          The publish workflow adds -Dimage.repository=ghcr.io/<owner>/cellophane, builds each architecture on
